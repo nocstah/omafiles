@@ -119,10 +119,52 @@ Item {
     // than a single handler call, and "g" is a stateful two-key chord
     // (hostRoot.gPending + hostGTimer), not a plain "key -> action".
     if (event.key === Qt.Key_Escape) {
-      if (NavState.searching) { if (hostControllers && hostControllers.searchOps) hostControllers.searchOps.exitSearch() }
-      else if (PreviewState.previewOpen) PreviewState.previewOpen = false
+      if (SelectionState.visualMode) SelectionState.visualMode = false
+      else if (SelectionState.markedCount > 0) SelectionState.clearMarks()
+      else if (NavState.searching) { if (hostControllers && hostControllers.searchOps) hostControllers.searchOps.exitSearch() }
+      // NOTE: Escape used to close the preview here. That made sense when the
+      // preview was a thing you summoned with Space; now that it is the third
+      // pane of the default layout, Escape collapsing it means the layout
+      // falls apart whenever you back out of a filter or visual mode -- and it
+      // is not obvious how to get it back. Space still toggles it.
       else if (PickerState.active) { if (hostRoot) hostRoot.cancelPicker() }
       else if (TabsState.tabs.length > 1) { if (hostControllers && hostControllers.tabOps) hostControllers.tabOps.closeTab() }
+      event.accepted = true
+      return
+    }
+    // g-prefix jumps (yazi): `g` then a letter. Hardcoded for the same reason
+    // the "gg" chord below is -- it is stateful (hostRoot.gPending), not a
+    // plain "key -> action" the resolver can express. MUST run before the
+    // resolver, or `gd` would trash the selection via the `d` binding and `gp`
+    // would paste. A `g` followed by anything unmapped just cancels.
+    if (hostRoot && hostRoot.gPending && event.key !== Qt.Key_G && event.modifiers === Qt.NoModifier) {
+      hostRoot.gPending = false
+      var gTargets = {}
+      gTargets[Qt.Key_H] = Paths.homeDir
+      gTargets[Qt.Key_D] = Paths.homeDir + "/Downloads"
+      gTargets[Qt.Key_O] = Paths.homeDir + "/Documents"
+      gTargets[Qt.Key_C] = Paths.homeDir + "/.config"
+      gTargets[Qt.Key_P] = Paths.homeDir + "/Projects"
+      gTargets[Qt.Key_M] = Paths.homeDir + "/Music"
+      gTargets[Qt.Key_I] = Paths.homeDir + "/Pictures"
+      gTargets[Qt.Key_V] = Paths.homeDir + "/Videos"
+      gTargets[Qt.Key_T] = Paths.trashDir
+      gTargets[Qt.Key_R] = "/"
+      var gDest = gTargets[event.key]
+      if (gDest !== undefined) {
+        if (hostControllers && hostControllers.navController) hostControllers.navController.navigateTo(gDest)
+        event.accepted = true
+        return
+      }
+    }
+    // 1-9 tab jump (yazi). Also hardcoded rather than resolver-driven: it is
+    // one behaviour over a RANGE of keys, so expressing it as data would mean
+    // nine near-identical entries whose only difference is the index.
+    if (event.key >= Qt.Key_1 && event.key <= Qt.Key_9 && event.modifiers === Qt.NoModifier) {
+      var wanted = event.key - Qt.Key_1
+      if (wanted < TabsState.tabs.length && wanted !== TabsState.activeTabIndex) {
+        if (hostControllers && hostControllers.tabOps) hostControllers.tabOps.switchToTab(wanted)
+      }
       event.accepted = true
       return
     }
@@ -175,17 +217,18 @@ Item {
       var down = Math.min(NavState.visibleEntries.length - 1, SelectionState.selectedIndex + 1)
       if (extend) SelectionState.selectRange(down)
       else SelectionState.selectOnly(down)
-      hostListView.positionViewAtIndex(down, ListView.Contain)
+      hostListView.positionWithScrolloff(down)
       break
     }
     case "move_up": {
       var up = Math.max(0, SelectionState.selectedIndex - 1)
       if (extend) SelectionState.selectRange(up)
       else SelectionState.selectOnly(up)
-      hostListView.positionViewAtIndex(up, ListView.Contain)
+      hostListView.positionWithScrolloff(up)
       break
     }
     case "select_none":
+      SelectionState.clearMarks()
       SelectionState.selectNone()
       break
     case "select_all":
@@ -250,6 +293,55 @@ Item {
       break
     case "undo":
       if (hostControllers && hostControllers.actionEngine) hostControllers.actionEngine.undoLast()
+      break
+
+    // ---- yazi muscle memory ------------------------------------------------
+    // These ride the same resolver as everything above, so they are
+    // rebindable from keybindings.toml like any other action. Their DEFAULT
+    // keys (see state/KeyboardDefaults.qml) are all keys that were previously
+    // unbound, and the aliases are additive: Ctrl+C/X/V and Delete still work,
+    // so nothing a mouse-driven user relies on moves.
+    case "delete_permanent":
+      // Goes through the SAME confirm dialog as trash -- the dialog just says
+      // so -- because this one has no undo.
+      if (hostControllers && hostControllers.actionEngine) hostControllers.actionEngine.requestDeletePermanent()
+      break
+    case "yazi_mode":
+      // Sidebar out, parent + preview in, ratios locked to 2/3/4. One switch,
+      // because the three columns only make sense together -- toggling them
+      // separately just produced a four-pane hybrid.
+      NavState.yaziMode = !NavState.yaziMode
+      if (NavState.yaziMode) {
+        NavState.parentColumnOpen = true
+        PreviewState.previewOpen = true
+      } else {
+        // Leaving the mode has to put the columns away too. Only restoring the
+        // sidebar left the parent column and preview standing, so "off" looked
+        // like yazi mode with a sidebar bolted on and the two states were
+        // indistinguishable.
+        NavState.parentColumnOpen = false
+        PreviewState.previewOpen = false
+      }
+      break
+    case "filter":
+      if (hostControllers && hostControllers.searchOps) hostControllers.searchOps.startFilter()
+      break
+    case "zoxide":
+      if (hostControllers && hostControllers.searchOps) hostControllers.searchOps.startZoxide()
+      break
+    case "cycle_linemode":
+      // yazi's linemode cycle: none -> meta -> perms -> owner.
+      NavState.cycleLineMode()
+      break
+    case "visual_mode":
+      // Sticky range selection. Anchor where the cursor is now, so the first
+      // j/k already extends from the right row.
+      if (SelectionState.visualMode) {
+        SelectionState.visualMode = false
+      } else {
+        SelectionState.visualMode = true
+        SelectionState.anchorIndex = SelectionState.selectedIndex
+      }
       break
     default:
       return

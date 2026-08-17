@@ -3,6 +3,9 @@ import QtMultimedia
 import qs.Commons
 import qs.Ui
 import "../shared"
+import "../logic"
+import "../state"
+import "../shared/Utils.js" as Utils
 
 // Preview panel (Space). Eleventh component extracted from
 // core -- purely read-only (no clicks of its own beyond
@@ -31,6 +34,10 @@ Item {
   property url pdfImageSource: ""
   property var audioInfo: []
   property string fallbackSizeText: ""
+  // Non-empty when the cursor is on a directory: preview its contents, the
+  // way yazi's third column does, instead of showing "no file selected".
+  property string dirPath: ""
+  property Item fileMeta: null
 
   // Stops any playback in flight when the previewed entry changes (arrow-
   // key navigation to another file) -- without this, the previous video/
@@ -46,7 +53,7 @@ Item {
     anchors.top: parent.top
     anchors.bottom: parent.bottom
     anchors.right: parent.right
-    width: parent.width * 0.45 - Style.spacing.rowGap
+    width: parent.width * (1 - NavState.listFraction) - Style.spacing.rowGap
     radius: Style.cornerRadius
     color: Color.menu.selectedBackground
     borderSpec: Border.flat(Color.menu.border, Style.normalBorderWidth)
@@ -63,6 +70,7 @@ Item {
       spacing: Style.spacing.sm
 
       Text {
+        id: previewTitle
         width: parent.width
         text: root.entryName
         font.pixelSize: Style.font.title
@@ -72,7 +80,7 @@ Item {
         elide: Text.ElideMiddle
       }
 
-      PanelSeparator { foreground: Color.menu.text; strength: 0.15 }
+      PanelSeparator { id: previewSep; foreground: Color.menu.text; strength: 0.15 }
 
       Image {
         visible: root.isImageEntry
@@ -249,7 +257,8 @@ Item {
       }
 
       Column {
-        visible: root.hasEntry && !root.isImageEntry && !root.isTextEntry
+        visible: root.dirPath === ""
+          && root.hasEntry && !root.isImageEntry && !root.isTextEntry
           && !root.isVideoEntry
           && !(root.isPdfEntry && root.pdfImageSource !== "")
           && !root.isAudioEntry
@@ -278,11 +287,85 @@ Item {
       }
 
       EmptyState {
-        visible: !root.hasEntry
+        visible: !root.hasEntry && root.dirPath === ""
         centerOn: parent
         message: "No file selected"
         subMessage: "Select a file to preview its contents"
       }
     }
+
+    // Directory under the cursor -> its listing (yazi's third column).
+    // Deliberately a SIBLING of the content Column, not a child: as a child
+    // it rendered its first row straight on top of the filename header, no
+    // matter how its height was expressed. Anchoring under the header is
+    // explicit and cannot be relaid out from under us.
+    Item {
+      visible: root.dirPath !== ""
+      clip: true
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      anchors.top: parent.top
+      anchors.topMargin: previewPanel.contentTopInset + previewTitle.height
+        + previewSep.height + Style.spacing.sm * 2
+      anchors.leftMargin: previewPanel.contentLeftInset
+      anchors.rightMargin: previewPanel.contentRightInset
+      anchors.bottomMargin: previewPanel.contentBottomInset
+
+      DirLister {
+        id: dirPreviewLister
+        showHidden: NavState.showHidden
+      }
+
+      Connections {
+        target: root
+        function onDirPathChanged() { if (root.dirPath !== "") dirPreviewLister.list(root.dirPath) }
+      }
+
+      ListView {
+        id: dirPreviewList
+        anchors.fill: parent
+        model: dirPreviewLister.entries
+        interactive: true
+        boundsBehavior: Flickable.StopAtBounds
+        delegate: Item {
+          id: dirPreviewRow
+          required property var modelData
+          width: dirPreviewList.width
+          height: dirRowVisual.implicitHeight
+            + (NavState.compactMode ? Style.spacing.xs : Style.spacing.md) * 2
+
+          // Deliberately does NOT request folder counts. FolderCountState
+          // marks a path pending and never clears it, so a path whose request
+          // does not land is permanently un-requestable — by anyone. This
+          // column re-lists on EVERY cursor move, so requesting here marked
+          // paths faster than the counter could answer and poisoned the cache
+          // for the main list, which silently lost its item counts. Cached
+          // counts still show; folders you have not visited show age only.
+
+          FileRowVisual {
+            id: dirRowVisual
+            anchors.fill: parent
+            anchors.rightMargin: Style.spacing.controlGap
+            name: dirPreviewRow.modelData.name || ""
+            isDir: dirPreviewRow.modelData.type === "dir"
+            isSymlink: dirPreviewRow.modelData.isSymlink === true
+            compact: NavState.compactMode
+            isBroken: dirPreviewRow.modelData.link === "broken"
+            fileIconGlyph: Utils.iconFor(dirPreviewRow.modelData)
+            metaText: root.fileMeta
+              ? root.fileMeta.lineFor(dirPreviewRow.modelData, root.dirPath) : ""
+          }
+        }
+      }
+
+      EmptyState {
+        visible: dirPreviewLister.entries.length === 0
+        centerOn: parent
+        message: "Empty folder"
+        subMessage: ""
+      }
+    }
+
   }
 }

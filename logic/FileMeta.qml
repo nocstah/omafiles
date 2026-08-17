@@ -22,6 +22,18 @@ Item {
   // fills it first (active or any background panel) serves them all,
   // so this function always reads the same copy regardless of who
   // paints the row.
+  // Single entry point for the row subtitle — switches on the linemode so the
+  // four call sites (list, background panel, parent column, preview) stay
+  // identical and cannot drift apart.
+  function lineFor(entry, basePath) {
+    switch (NavState.lineMode) {
+    case "none":  return ""
+    case "perms": return entry.perms || ""
+    case "owner": return entry.owner || ""
+    default:      return metaFor(entry, basePath)
+    }
+  }
+
   function metaFor(entry, basePath) {
     if (entry.link === "broken") return "Broken link"
     // CONTENT search result (ripgrep, Beta 3): the subtitle is the

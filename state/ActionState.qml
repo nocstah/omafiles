@@ -31,4 +31,10 @@ QtObject {
   // singleton directly (ConflictState.*ConflictOpen etc.), this was the
   // only one going through `root` instead.
   property var pendingDeleteNames: []
+
+  // Set alongside pendingDeleteNames when the request came from the permanent
+  // delete path (Shift+D) rather than trash: same confirm flow, different
+  // wording, and no undo entry pushed on confirm. Lives here with its sibling
+  // for the same reason pendingDeleteNames does -- it was on `root` before.
+  property bool pendingDeletePermanent: false
 }

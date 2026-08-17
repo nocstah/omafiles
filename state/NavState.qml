@@ -29,6 +29,65 @@ QtObject {
   // the current folder, not a recursive search). Empty = no filter.
   property string searchQuery: ""
 
+  // Local-only filter (yazi `f`). searchQuery ALREADY filters the current
+  // folder through visibleEntries below; what this flag adds is suppressing
+  // the global deep search that otherwise replaces the listing with
+  // system-wide plocate hits at 2+ characters. So: same box, stays home.
+  property bool filterOnly: false
+
+  // zoxide jump (yazi `z`): same input bar again, but Enter resolves the text
+  // through `zoxide query` and navigates, instead of filtering anything.
+  property bool zoxideMode: false
+
+  // Per-directory cursor memory: path -> name of the row the cursor was on
+  // when you last left it. yazi restores your position when you re-enter a
+  // folder; without it every entry starts at the top, which is what makes
+  // going back and forth feel like starting over. Session-lifetime only —
+  // deliberately not persisted, since a stale row from days ago is noise.
+  property var cursorMemory: ({})
+
+  // Linemode, yazi's `m`: what the second line of every row carries.
+  //   none  — nothing. Rows collapse to one line: this is compact mode, and
+  //           the density comes from dropping the RESERVED height, not from
+  //           blanking text in a tall row.
+  //   meta  — item count / size, plus age (the original subtitle)
+  //   perms — ls-style permission string
+  //   owner — owning user
+  readonly property var lineModes: ["none", "meta", "perms", "owner"]
+  property string lineMode: "none"
+  function cycleLineMode() {
+    var i = lineModes.indexOf(lineMode)
+    lineMode = lineModes[(i + 1) % lineModes.length]
+  }
+
+  // Kept as a name because row height, padding and the count-skip all key off
+  // "is there a second line at all".
+  readonly property bool compactMode: lineMode === "none"
+
+  // Folder item counts are only ever DRAWN in meta mode, and producing one
+  // stats every child of every visible folder. Any other mode skips the walk.
+  readonly property bool needsFolderCounts: lineMode === "meta"
+
+  // yazi mode: the window becomes a sliding parent | current | preview view
+  // over the path, with NO sidebar. The bookmarks/devices sidebar is chrome,
+  // not part of the cascade — leaving it up meant four panes, which is why the
+  // layout never read as yazi no matter what the three columns did.
+  //
+  // Ratios are locked to 2/3/4 ninths (tony-tui's Miller-column contract):
+  // parent 2/9, current 3/9, preview 4/9, and the parent never resizes.
+  property bool yaziMode: true
+
+  // Fraction of the space RIGHT of the parent column that the file list takes.
+  // In yazi mode the parent has already eaten 2/9, so the remaining 7/9 splits
+  // 3:4 -> 3/7 list, 4/7 preview. Outside the mode, upstream's 55/45.
+  readonly property real listFraction: yaziMode ? (3 / 7) : 0.55
+
+  // Parent column (yazi's left column), toggled with Shift+P. ON by default:
+  // the three panes only work as a system — parent for where you came from,
+  // middle for where you are, preview for what you are pointing at. Two of
+  // them behind separate opt-ins meant the layout never actually assembled.
+  property bool parentColumnOpen: true
+
   // Visible subset of `entries` after applying the quick filter. Derived
   // (readonly): previously it was computed in root.visibleEntries and read by 24
   // sites of logic/. Same expression, now next to its data source.
