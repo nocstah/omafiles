@@ -220,7 +220,7 @@ Item {
     anchors.fill: parent
     z: 10
     opened: ActionState.pendingDeleteNames.length > 0
-    message: NavState.currentPath === Paths.trashDir
+    message: (NavState.currentPath === Paths.trashDir || ActionState.pendingDeletePermanent)
       ? (ActionState.pendingDeleteNames.length === 1
         ? "Delete \"" + ActionState.pendingDeleteNames[0] + "\" PERMANENTLY? This cannot be undone."
         : "Delete " + ActionState.pendingDeleteNames.length + " items PERMANENTLY? This cannot be undone.")
@@ -231,7 +231,7 @@ Item {
     cancelText: "Cancel"
     background: Color.menu.background
     foreground: Color.menu.text
-    onCanceled: ActionState.pendingDeleteNames = []
+    onCanceled: { ActionState.pendingDeleteNames = []; ActionState.pendingDeletePermanent = false }
     onConfirmed: if (controllers && controllers.actionEngine) controllers.actionEngine.confirmDelete()
   }
 

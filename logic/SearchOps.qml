@@ -29,13 +29,30 @@ Item {
     EditModeState.creatingFolder = false
     EditModeState.creatingFile = false
     NavState.searching = true
+    NavState.filterOnly = false
+    NavState.zoxideMode = false
     NavState.searchQuery = ""
     NavState.searchTruncated = false
     list.contentY = list.originY
   }
 
+  // yazi `f`: filter THIS folder, no global search. Same bar, same substring
+  // match, but runDeepSearch() bails so the listing is never replaced.
+  function startFilter() {
+    startSearch()
+    if (NavState.searching) NavState.filterOnly = true
+  }
+
+  // yazi `z`: type a fragment, land in the frecent directory zoxide picks.
+  function startZoxide() {
+    startSearch()
+    if (NavState.searching) NavState.zoxideMode = true
+  }
+
   function exitSearch() {
     searchBackend.cancel()
+    NavState.filterOnly = false
+    NavState.zoxideMode = false
     NavState.searching = false
     NavState.searchQuery = ""
     NavState.searchTruncated = false
@@ -45,6 +62,9 @@ Item {
   }
 
   function runDeepSearch() {
+    // `f` and `z` borrow this bar but must never trigger the global search:
+    // filtering stays in the current folder, and zoxide resolves on Enter.
+    if (NavState.filterOnly || NavState.zoxideMode) return
     // Phase 19: incremental search only starts with 2+ characters; with
     // 0-1 the searcher shows the normal listing (see restoreListing, called
     // by the SearchBar debounce).

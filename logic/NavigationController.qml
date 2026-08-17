@@ -120,6 +120,28 @@ Item {
     } else if (SelectionState.selectedIndex >= NavState.visibleEntries.length) {
       SelectionState.selectedIndex = NavState.visibleEntries.length - 1
     }
+    // Re-highlight anything in this folder that is marked, so a selection
+    // spanning several directories stays visible as you move between them.
+    if (SelectionState.markedCount > 0) {
+      var here = []
+      for (var mi = 0; mi < NavState.visibleEntries.length; mi++) {
+        if (SelectionState.markedPaths[Utils.joinPath(NavState.currentPath, NavState.visibleEntries[mi].name)])
+          here.push(mi)
+      }
+      if (here.length > 0) {
+        var merged = SelectionState.selectedIndices.slice()
+        here.forEach(function (i) { if (merged.indexOf(i) < 0) merged.push(i) })
+        SelectionState.selectedIndices = merged
+      }
+    }
+    if (SelectionState.selectedIndex < 0 && NavState.visibleEntries.length > 0) {
+      // Land the cursor on the first row. _goToPath clears the selection, and
+      // nothing put it back, so entering a folder left NO cursor until you
+      // pressed j — which also meant the preview column had nothing to show.
+      // In yazi the cursor always exists; that is what makes the three panes
+      // relate to each other the moment you arrive somewhere.
+      SelectionState.selectOnly(0)
+    }
   }
 
   // Live refresh of the ACTIVE panel: starts native QFileSystemWatcher via DirLister.
@@ -150,8 +172,27 @@ Item {
     // the archive (see enter()/goUp()/inArchive), so if this
     // runs it means the user went somewhere else for real.
     if (ArchiveState.inArchive) archiveBrowser.forceExit()
+    // Remember where the cursor was in the folder being left, BEFORE
+    // currentPath moves — visibleEntries belongs to the old listing here.
+    var leaving = NavState.currentPath
+    // A real multi-selection becomes marks, so it is still there (and still
+    // actionable) after you move. Single selection = the cursor, not a mark.
+    if (leaving && leaving !== path && SelectionState.selectedIndices.length > 1) {
+      var marks = []
+      SelectionState.selectedIndices.forEach(function (i) {
+        if (i >= 0 && i < NavState.visibleEntries.length)
+          marks.push(Utils.joinPath(leaving, NavState.visibleEntries[i].name))
+      })
+      SelectionState.addMarks(marks)
+    }
+    var selIdx = SelectionState.selectedIndex
+    if (leaving && leaving !== path && selIdx >= 0 && selIdx < NavState.visibleEntries.length) {
+      NavState.cursorMemory[leaving] = NavState.visibleEntries[selIdx].name
+    }
     NavState.currentPath = path
     SelectionState.selectOnly(-1)
+    // Leaving a folder ends visual mode, like leaving a buffer in vim.
+    SelectionState.visualMode = false
     EditModeState.renamingIndex = -1
     EditModeState.creatingFolder = false
     EditModeState.creatingFile = false
@@ -167,6 +208,13 @@ Item {
     // flicker with the previous tab's listing was seen during those
     // milliseconds. refresh() brings a fresh copy behind
     // the scenes soon anyway, replacing it unnoticed.
+    // Restore the remembered row for the destination. goUp() and reveal
+    // already fill pendingSelectNames with something more specific, so they
+    // win — this only covers arriving with no particular row in mind.
+    if (NavState.pendingSelectNames.length === 0) {
+      var remembered = NavState.cursorMemory[path]
+      if (remembered) NavState.pendingSelectNames = [remembered]
+    }
     if (root.tabEntriesCache[path]) NavState.entries = root.tabEntriesCache[path]
     refresh()
     startDirWatch(path)
@@ -276,7 +324,34 @@ Item {
     if (ArchiveState.inArchive) { archiveBrowser.up(); return }
     if (NavState.currentPath === "/") return
     var idx = NavState.currentPath.lastIndexOf("/")
+    // Land on the folder we just left, the way yazi does: going up should put
+    // the cursor back on your entry point, not at the top of the parent, so
+    // j/k (and Up/Down) continue from where you were. pendingSelectNames is
+    // consumed once the parent listing loads and sets anchorIndex too, so
+    // Shift-range selection starts from the right row as well.
+    var leaving = NavState.currentPath.substring(idx + 1)
+    if (leaving) NavState.pendingSelectNames = [leaving]
     navigateTo(idx > 0 ? NavState.currentPath.substring(0, idx) : "/")
+  }
+
+  // yazi `z`: resolve a fragment through zoxide's frecency database (the same
+  // one the shells here feed) and jump to the best match. `query --list`
+  // returns candidates best-first; we take the top one, which is what
+  // `z foo` does in a terminal. Silent no-op when zoxide has no match or
+  // is not installed — jumping somewhere arbitrary would be worse.
+  function zoxideJump(query) {
+    var q = String(query || "").trim()
+    if (q.length === 0 || zoxideProc.busy) return
+    zoxideProc.start(["zoxide", "query", "--list", q])
+  }
+
+  Backend.ProcessRunner {
+    id: zoxideProc
+    onFinished: function (result) {
+      if (!result || result.cancelled || result.exitCode !== 0) return
+      var lines = String(result.stdout || "").split("\n").filter(function (l) { return l.trim().length > 0 })
+      if (lines.length > 0) navigateTo(lines[0].trim())
+    }
   }
 
   Timer {

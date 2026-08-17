@@ -44,6 +44,7 @@ Item {
   function forceActiveFocus() { listView.forceActiveFocus() }
   function positionViewAtBeginning() { listView.positionViewAtBeginning() }
   function positionViewAtIndex(index, mode) { listView.positionViewAtIndex(index, mode) }
+
   // Index of the first visible row (to save/restore scroll by
   // index when switching tabs).
   function firstVisibleIndex() { return listView.indexAt(listView.width / 2, listView.contentY + 4) }
@@ -90,7 +91,7 @@ Item {
               anchors.top: parent.top
               anchors.bottom: parent.bottom
               anchors.left: parent.left
-              width: PreviewState.previewOpen ? parent.width * 0.55 : parent.width
+              width: PreviewState.previewOpen ? parent.width * NavState.listFraction : parent.width
               acceptedButtons: Qt.RightButton
               onClicked: function (mouse) {
                 var pos = mapToItem(card, mouse.x, mouse.y)
@@ -105,7 +106,7 @@ Item {
               anchors.top: parent.top
               anchors.bottom: parent.bottom
               anchors.left: parent.left
-              width: PreviewState.previewOpen ? parent.width * 0.55 : parent.width
+              width: PreviewState.previewOpen ? parent.width * NavState.listFraction : parent.width
               keys: ["text/uri-list"]
               onEntered: function (drag) { if (!drag.hasUrls) drag.accepted = false }
               onDropped: function (drop) {
@@ -121,7 +122,7 @@ Item {
               anchors.top: parent.top
               anchors.bottom: parent.bottom
               anchors.left: parent.left
-              width: PreviewState.previewOpen ? parent.width * 0.55 : parent.width
+              width: PreviewState.previewOpen ? parent.width * NavState.listFraction : parent.width
               property real wheelAccumulator: 0
               onWheel: function (wheel) {
                 var step = Util.wheelSteps(wheelAccumulator, wheel.angleDelta.y)
@@ -139,7 +140,7 @@ Item {
               anchors.top: parent.top
               height: listView.y
               anchors.left: parent.left
-              width: PreviewState.previewOpen ? parent.width * 0.55 : parent.width
+              width: PreviewState.previewOpen ? parent.width * NavState.listFraction : parent.width
               catcherListView: listView
               measuredRowHeight: root.measuredRowHeight
               marqueeTarget: SelectionState
@@ -147,11 +148,36 @@ Item {
 
             ListView {
               id: listView
+
+              // Scrolloff, the yazi/vim habit: keep a few rows of context
+              // beyond the cursor rather than letting it sit against the
+              // viewport edge. ListView.Contain only scrolls once the row
+              // would leave the view, so j/k pinned the cursor to the very
+              // top or bottom line and you moved blind into what came next.
+              //
+              // Defined HERE, on the ListView, because that is what
+              // KeyboardShortcuts receives as hostListView -- the same
+              // function on ActiveFileList's root was simply never reachable
+              // and the calls failed silently, scrolling nothing at all.
+              property int scrolloff: 4
+              function positionWithScrolloff(index) {
+                if (count <= 0 || index < 0) return
+                var it = itemAtIndex(index)
+                var rowH = it ? it.height : (count > 0 ? contentHeight / count : 0)
+                if (!(rowH > 0)) { positionViewAtIndex(index, ListView.Contain); return }
+                var margin = scrolloff * rowH
+                var top = index * rowH
+                var bottom = top + rowH
+                var maxY = Math.max(originY, contentHeight - height)
+                if (top - margin < contentY) contentY = Math.max(originY, top - margin)
+                else if (bottom + margin > contentY + height) contentY = Math.min(maxY, bottom + margin - height)
+              }
+
               anchors.top: listSep.bottom
               anchors.topMargin: Style.spacing.md
               anchors.bottom: parent.bottom
               anchors.left: parent.left
-              width: PreviewState.previewOpen ? parent.width * 0.55 : parent.width
+              width: PreviewState.previewOpen ? parent.width * NavState.listFraction : parent.width
               clip: true
               model: NavState.visibleEntries
               focus: root && root.opened && !NavState.searching
@@ -297,5 +323,7 @@ Item {
               pdfImageSource: PreviewContentState.previewPdfImage ? Util.fileUrl(PreviewContentState.previewPdfImage) : ""
               audioInfo: PreviewContentState.previewAudioInfo
               fallbackSizeText: PreviewContentState.previewEntry ? Utils.formatSize(PreviewContentState.previewEntry.size) : ""
+              dirPath: PreviewContentState.previewDirPath
+              fileMeta: controllers ? controllers.fileMeta : null
             }
 }

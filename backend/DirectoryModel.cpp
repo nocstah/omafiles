@@ -7,9 +7,38 @@
 
 #include <algorithm>
 
+#include <QHash>
 #include <dirent.h>
+#include <pwd.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+namespace {
+// ls-style permission string from st_mode.
+QString permString(mode_t m) {
+  QString r(10, QLatin1Char('-'));
+  r[0] = S_ISDIR(m) ? QLatin1Char('d') : (S_ISLNK(m) ? QLatin1Char('l') : QLatin1Char('-'));
+  static const mode_t bits[9] = {S_IRUSR, S_IWUSR, S_IXUSR, S_IRGRP, S_IWGRP,
+                                 S_IXGRP, S_IROTH, S_IWOTH, S_IXOTH};
+  static const char chars[9] = {'r', 'w', 'x', 'r', 'w', 'x', 'r', 'w', 'x'};
+  for (int i = 0; i < 9; ++i)
+    if (m & bits[i]) r[i + 1] = QLatin1Char(chars[i]);
+  return r;
+}
+
+// getpwuid is a passwd-database lookup; a directory of 4000 files owned by one
+// user would otherwise do 4000 of them. Scan-thread local, so no locking.
+QString ownerName(uid_t uid) {
+  static thread_local QHash<uint, QString> cache;
+  auto it = cache.constFind(uid);
+  if (it != cache.constEnd()) return *it;
+  const struct passwd *pw = ::getpwuid(uid);
+  const QString name = pw && pw->pw_name ? QString::fromLocal8Bit(pw->pw_name)
+                                         : QString::number(uid);
+  cache.insert(uid, name);
+  return name;
+}
+} // namespace
 
 namespace {
 
@@ -140,6 +169,10 @@ int gatherOne(const QByteArray &p, bool showHidden,
                                 : QStringLiteral("broken"))
                     : QString();
     e.isDir = followed && S_ISDIR(s.st_mode);
+    // From the stat already taken — the symlink's own mode when it is broken,
+    // so a dangling link still reports something truthful.
+    e.perms = permString(followed ? s.st_mode : ls.st_mode);
+    e.owner = ownerName(followed ? s.st_uid : ls.st_uid);
 
     if (e.isDir) {
       e.type = QStringLiteral("dir");
@@ -365,6 +398,8 @@ QVariantList DirectoryModel::entries() const {
     m[QStringLiteral("size")] = e.size;
     m[QStringLiteral("mtime")] = e.mtime;
     m[QStringLiteral("link")] = e.link;
+    m[QStringLiteral("perms")] = e.perms;
+    m[QStringLiteral("owner")] = e.owner;
     out.push_back(m);
   }
   return out;

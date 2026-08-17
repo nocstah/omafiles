@@ -53,8 +53,11 @@ QtObject {
 
   readonly property var actions: [
     { id: "open_terminal",     label: "Open a terminal here",                fixed: false, keys: [{ key: "return", mod: "shift" }] },
-    { id: "go_up",              label: "Go up a directory",                   fixed: false, keys: [{ key: "backspace", mod: "any" }, { key: "h", mod: "none" }] },
-    { id: "open",                label: "Open (enter directory / launch file)", fixed: false, keys: [{ key: "return", mod: "any" }, { key: "l", mod: "none" }] },
+    // left/right mirror h/l, yazi-style. mod "none" is load-bearing on both:
+    // it is what lets Alt+Left/Right fall through to nav_back/nav_forward
+    // further down instead of being swallowed here.
+    { id: "go_up",              label: "Go up a directory",                   fixed: false, keys: [{ key: "backspace", mod: "any" }, { key: "h", mod: "none" }, { key: "left", mod: "none" }] },
+    { id: "open",                label: "Open (enter directory / launch file)", fixed: false, keys: [{ key: "return", mod: "any" }, { key: "l", mod: "none" }, { key: "right", mod: "none" }] },
     { id: "toggle_preview",     label: "Toggle preview (Quick Look)",         fixed: false, keys: [{ key: "space", mod: "any" }] },
     { id: "search",              label: "Search files",                        fixed: false, keys: [{ key: "/", mod: "any" }, { key: "f", mod: "ctrl" }] },
     { id: "command_palette",    label: "Command palette",                     fixed: false, keys: [{ key: ":", mod: "any" }, { key: "p", mod: "ctrl" }] },
@@ -66,7 +69,7 @@ QtObject {
     { id: "select_all",         label: "Select all",                          fixed: false, keys: [{ key: "a", mod: "ctrl" }] },
     { id: "invert_selection",  label: "Invert selection",                    fixed: false, keys: [{ key: "i", mod: "ctrl" }] },
     { id: "rename",              label: "Rename",                              fixed: false, keys: [{ key: "f2", mod: "any" }] },
-    { id: "delete",              label: "Delete (to trash)",                   fixed: false, keys: [{ key: "delete", mod: "any" }] },
+    { id: "delete",              label: "Delete (to trash)",                   fixed: false, keys: [{ key: "delete", mod: "any" }, { key: "d", mod: "none" }] },
     { id: "refresh",             label: "Refresh",                             fixed: false, keys: [{ key: "f5", mod: "any" }] },
     { id: "reverse_sort",       label: "Reverse sort order",                  fixed: false, keys: [{ key: "s", mod: "shift" }] },
     { id: "cycle_sort",         label: "Cycle sort field",                    fixed: false, keys: [{ key: "s", mod: "none" }] },
@@ -78,12 +81,26 @@ QtObject {
     { id: "nav_forward",        label: "Forward",                             fixed: false, keys: [{ key: "right", mod: "alt" }] },
     { id: "close_tab",           label: "Close active panel",                  fixed: false, keys: [{ key: "w", mod: "ctrl" }] },
     { id: "next_tab",             label: "Next panel",                          fixed: true,  keys: [{ key: "tab", mod: "ctrl" }] },
-    { id: "toggle_hidden",      label: "Toggle hidden files",                 fixed: false, keys: [{ key: "h", mod: "ctrl" }] },
-    { id: "copy",                 label: "Copy",                                fixed: true,  keys: [{ key: "c", mod: "ctrl" }] },
-    { id: "cut",                  label: "Cut",                                 fixed: true,  keys: [{ key: "x", mod: "ctrl" }] },
-    { id: "paste",                label: "Paste",                               fixed: true,  keys: [{ key: "v", mod: "ctrl" }] },
+    { id: "toggle_hidden",      label: "Toggle hidden files",                 fixed: false, keys: [{ key: "h", mod: "ctrl" }, { key: ".", mod: "none" }] },
+    { id: "copy",                 label: "Copy",                                fixed: true,  keys: [{ key: "c", mod: "ctrl" }, { key: "y", mod: "none" }] },
+    { id: "cut",                  label: "Cut",                                 fixed: true,  keys: [{ key: "x", mod: "ctrl" }, { key: "x", mod: "none" }] },
+    { id: "paste",                label: "Paste",                               fixed: true,  keys: [{ key: "v", mod: "ctrl" }, { key: "p", mod: "none" }] },
     { id: "redo",                 label: "Redo",                                fixed: false, keys: [{ key: "z", mod: "ctrl+shift" }, { key: "y", mod: "ctrl" }] },
-    { id: "undo",                 label: "Undo",                                fixed: true,  keys: [{ key: "z", mod: "ctrl" }] }
+    { id: "undo",                 label: "Undo",                                fixed: true,  keys: [{ key: "z", mod: "ctrl" }] },
+
+    // ---- yazi muscle memory (local) ---------------------------------------
+    // New semantic actions, appended so they resolve AFTER every stock
+    // binding above -- each default key is one that was previously unbound,
+    // and each is rebindable from keybindings.toml like any other action.
+    // Ordering notes: "f"/"z"/"v"/"p" alternates all use mod "none", so the
+    // Ctrl+ forms above (search, undo/redo, paste, command_palette) still win
+    // when a modifier is actually held.
+    { id: "delete_permanent",  label: "Delete permanently (no undo)",        fixed: false, keys: [{ key: "d", mod: "shift" }] },
+    { id: "yazi_mode",          label: "Toggle yazi mode (parent + preview)", fixed: false, keys: [{ key: "p", mod: "shift" }] },
+    { id: "filter",               label: "Filter this folder",                  fixed: false, keys: [{ key: "f", mod: "none" }] },
+    { id: "zoxide",               label: "Zoxide jump",                         fixed: false, keys: [{ key: "z", mod: "none" }] },
+    { id: "cycle_linemode",    label: "Cycle line info (meta/perms/owner)",  fixed: false, keys: [{ key: "m", mod: "none" }] },
+    { id: "visual_mode",        label: "Visual (sticky range) selection",     fixed: false, keys: [{ key: "v", mod: "none" }] }
   ]
 
   // Populated by logic/KeybindingResolver.qml's reload(): { actionId: "key string" }.

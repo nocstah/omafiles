@@ -28,11 +28,14 @@ Item {
     function onSelectedIndexChanged() {
       if (PreviewState.previewOpen) {
         var idx = SelectionState.selectedIndex
-        if (idx >= 0 && idx < NavState.visibleEntries.length && NavState.visibleEntries[idx].type !== "dir") {
+        if (idx >= 0 && idx < NavState.visibleEntries.length) {
           loadPreview(NavState.visibleEntries[idx])
-        } else {
-          PreviewState.previewOpen = false
         }
+        // No else. _goToPath clears the selection to -1 on EVERY navigation,
+        // so closing the pane here meant the third column died the moment you
+        // moved anywhere and never came back (the cursor landing on row 0
+        // afterwards re-fired this, but previewOpen was already false). The
+        // pane stays; the next listing fills it.
       }
     }
   }
@@ -47,7 +50,17 @@ Item {
   }
 
   function loadPreview(entry) {
-    if (!entry || entry.type === "dir") return
+    if (!entry) return
+    // A directory previews as its own listing (the yazi third column), not as
+    // "nothing to show" and certainly not by closing the panel.
+    if (entry.type === "dir") {
+      PreviewContentState.previewRequestId += 1
+      PreviewContentState.previewEntry = entry
+      PreviewContentState.previewDirPath = Utils.entryPath(NavState.currentPath, entry)
+      PreviewState.previewOpen = true
+      return
+    }
+    PreviewContentState.previewDirPath = ""
     PreviewContentState.previewRequestId += 1
     var reqId = PreviewContentState.previewRequestId
     PreviewContentState.previewEntry = entry
