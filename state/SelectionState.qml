@@ -12,6 +12,33 @@ QtObject {
   property var selectedIndices: []
   property int anchorIndex: -1
 
+  // Visual mode (yazi `v`): sticky range selection — once on, j/k/arrows
+  // extend from anchorIndex without holding Shift. Cleared by `v` again, by
+  // Escape, and by any real navigation (see NavigationController._goToPath).
+  property bool visualMode: false
+
+  // Marks that survive navigation (yazi keeps its selection when you move).
+  // Absolute path -> true. A DELIBERATE multi-selection becomes marks when you
+  // leave the folder; a single selection does not, because with one item
+  // selectedIndices is just the cursor and every folder you passed through
+  // would end up marked.
+  property var markedPaths: ({})
+  property int markedCount: 0
+
+  function addMarks(paths) {
+    if (!paths || paths.length === 0) return
+    var m = Object.assign({}, markedPaths)
+    for (var i = 0; i < paths.length; i++) m[paths[i]] = true
+    markedPaths = m
+    markedCount = Object.keys(m).length
+  }
+  function clearMarks() {
+    if (markedCount === 0) return
+    markedPaths = ({})
+    markedCount = 0
+  }
+  function markedList() { return Object.keys(markedPaths) }
+
   // ---------- Selection marquee (drag over empty space) ----------
   // Coordinates in the ListView's content space (independent
   // of the scroll), not the viewport -- so the rectangle stays correct if

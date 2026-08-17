@@ -32,7 +32,8 @@ CursorSurface {
   property Item hostConflictActions: null
 
   width: hostListView.width
-  implicitHeight: rowContent.implicitHeight + Style.spacing.md * 2
+  implicitHeight: rowContent.implicitHeight
+    + (NavState.compactMode ? Style.spacing.xs : Style.spacing.md) * 2
   Accessible.role: Accessible.ListItem
   Accessible.name: modelData.name + (modelData.type === "dir" ? ", folder" : ", file")
   Accessible.selected: SelectionState.isSelected(index)
@@ -111,6 +112,11 @@ CursorSurface {
     readonly property bool _isDir: modelData.type === "dir"
     function _requestCount(force) {
       if (!_isDir) return
+      // Compact mode draws no subtitle, so the count would never be seen:
+      // don't spawn the walk. FolderCounter stats every child of every visible
+      // folder, which on a big tree is the most expensive part of a listing.
+      if (!NavState.needsFolderCounts) return
+
       if (!force && !FolderCountState.needsRequest(myPath)) return
       FolderCountState.markPending(myPath)
       Backend.FolderCounter.request(myPath, NavState.showHidden)
@@ -129,6 +135,9 @@ CursorSurface {
     Connections {
       target: NavState
       function onRefreshTickChanged() { rowContent._requestCount(true) }
+      // Leaving compact mode must fetch what compact skipped, or subtitles
+      // come back empty until you navigate away and return.
+      function onLineModeChanged() { if (NavState.needsFolderCounts) rowContent._requestCount(false) }
     }
 
     FileRowVisual {
@@ -136,13 +145,15 @@ CursorSurface {
       anchors.fill: parent
       name: modelData.name
       isDir: modelData.type === "dir"
+      isSymlink: modelData.isSymlink === true
+      compact: NavState.compactMode
       isBroken: modelData.link === "broken"
       highlighted: rowSurface.current
       dimmed: ClipboardState.clipboardMode === "cut" && ClipboardState.clipboardPaths.indexOf(Utils.entryPath(NavState.currentPath, modelData)) >= 0
       fileIconGlyph: Utils.iconFor(modelData)
       thumbSource: rowContent.imgThumb ? Util.fileUrl(rowContent.imgThumb)
         : (rowContent.vidThumb ? Util.fileUrl(rowContent.vidThumb) : "")
-      metaText: hostFileMeta.metaFor(modelData)
+      metaText: hostFileMeta.lineFor(modelData, NavState.currentPath)
       metaTooltip: hostFileMeta.metaTooltipFor(modelData)
       showNameText: EditModeState.renamingIndex !== index
     }
