@@ -76,7 +76,11 @@ Item {
     visible: NavState.searching
     opacity: NavState.searching ? 1 : 0
     Behavior on opacity { NumberAnimation { duration: 150 } }
-    placeholderText: "Search files…"
+    // Same bar, three jobs — say which one is running, or `f` and `z` look
+    // like the global search misbehaving.
+    placeholderText: NavState.zoxideMode ? "Jump to… (zoxide)"
+      : NavState.filterOnly ? "Filter this folder…"
+      : "Search files…"
     Accessible.role: Accessible.EditableText
     Accessible.name: "Search files"
     text: NavState.searchQuery
@@ -102,9 +106,17 @@ Item {
         else sb.collapse()
         event.accepted = true
       } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-        if (SelectionState.selectedIndex >= 0)
-          sb.navController.enter(NavState.visibleEntries[SelectionState.selectedIndex])
-        sb.searchOps.exitSearch()
+        if (NavState.zoxideMode) {
+          // Resolve through zoxide instead of opening a row: the text is a
+          // fragment of a path you have visited, not something in this folder.
+          var q = NavState.searchQuery
+          sb.searchOps.exitSearch()
+          sb.navController.zoxideJump(q)
+        } else {
+          if (SelectionState.selectedIndex >= 0)
+            sb.navController.enter(NavState.visibleEntries[SelectionState.selectedIndex])
+          sb.searchOps.exitSearch()
+        }
         event.accepted = true
       } else if (event.key === Qt.Key_Down) {
         var d = Math.min(NavState.visibleEntries.length - 1, SelectionState.selectedIndex + 1)
@@ -169,6 +181,9 @@ Item {
     onTriggered: {
       // Incremental recursive from 2 characters; with 0-1 the normal
       // listing of the current folder is restored (see SearchOps).
+      // `f`/`z` never reach the global search: filtering is already done by
+      // visibleEntries, and zoxide resolves on Enter.
+      if (NavState.filterOnly || NavState.zoxideMode) return
       if (NavState.searchQuery.length >= 2) sb.searchOps.runDeepSearch()
       else sb.searchOps.restoreListing()
     }

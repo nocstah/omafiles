@@ -7,6 +7,12 @@ import QtQuick
 // real result of loadPreview(), which stays in logic/PreviewLoader.qml.
 QtObject {
   property var previewEntry: null
+
+  // Path of the DIRECTORY under the cursor, "" for files. yazi's third column
+  // shows the contents of whatever the cursor is on, folders included; here a
+  // folder used to close the preview outright, so browsing with the preview
+  // open collapsed the layout on every directory row.
+  property string previewDirPath: ""
   property string previewText: ""
   property bool previewIsText: false
   // HTML with inline styles (SyntaxHighlighter) for the fragment

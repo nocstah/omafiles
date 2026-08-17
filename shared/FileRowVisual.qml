@@ -25,6 +25,36 @@ Item {
   property string name: ""
   property bool isDir: false
   property bool isBroken: false
+  property bool isSymlink: false
+
+  // Compact rows (yazi's shape): name only, one line, no subtitle. Passed in
+  // as a property rather than read from NavState because shared/ must never
+  // import state/ — see the layering rules in docs/architecture.
+  property bool compact: false
+
+  // yazi-style per-type colouring: you read a listing by colour before you
+  // read the names. Colours come from the [filetype] section of shell.toml
+  // (written by the noctalia template from the palette's ANSI terminal
+  // tokens), so they follow a theme switch like everything else. Each pick()
+  // falls back to the plain row colour, so a theme that supplies no
+  // [filetype] section renders exactly as upstream does.
+  readonly property color typeColor: {
+    if (isDir) return Color.pick("filetype.directory", Color.menu.text)
+    if (isSymlink) return Color.pick("filetype.symlink", Color.menu.text)
+    var dot = name.lastIndexOf(".")
+    var ext = dot > 0 ? name.substring(dot + 1).toLowerCase() : ""
+    if (/^(png|jpg|jpeg|gif|webp|bmp|svg|avif|heic|ico|tiff?|xcf|psd)$/.test(ext))
+      return Color.pick("filetype.image", Color.menu.text)
+    if (/^(mp3|flac|wav|ogg|opus|m4a|aac|mp4|mkv|webm|avi|mov|wmv|flv|m4v)$/.test(ext))
+      return Color.pick("filetype.media", Color.menu.text)
+    if (/^(zip|tar|gz|xz|bz2|zst|7z|rar|tgz|txz|tbz|lz4|lzma|iso|deb|rpm|jar)$/.test(ext))
+      return Color.pick("filetype.archive", Color.menu.text)
+    if (/^(sh|bash|zsh|fish|py|rb|pl|lua|js|ts|jsx|tsx|c|h|cpp|hpp|cc|rs|go|java|kt|qml|vim|nu)$/.test(ext))
+      return Color.pick("filetype.code", Color.menu.text)
+    if (/^(appimage|bin|run|exe|so|a|o)$/.test(ext))
+      return Color.pick("filetype.executable", Color.menu.text)
+    return Color.menu.text
+  }
   // Equivalent to "rowSurface.current" in the active panel -- the background
   // panel never sets it to true (there is no row selection there).
   property bool highlighted: false
@@ -56,8 +86,13 @@ Item {
   // height never changes -> position = index * rowHeight + subOffset exact.
   FontMetrics { id: _nameFM; font.family: Style.font.family; font.pixelSize: Style.font.title; font.weight: Font.Medium }
   FontMetrics { id: _metaFM; font.family: Style.font.family; font.pixelSize: Style.font.bodySmall }
-  implicitHeight: Math.max(Style.spacing.controlHeight,
-    Math.ceil(_nameFM.height) + Style.spacing.xs + Math.ceil(_metaFM.height))
+  // Two-line height is RESERVED whether or not a subtitle is drawn, so rows
+  // never jump. Compact drops the reservation entirely: that is where the
+  // density comes from, not from hiding text in a tall row.
+  implicitHeight: root.compact
+    ? Math.ceil(_nameFM.height)
+    : Math.max(Style.spacing.controlHeight,
+        Math.ceil(_nameFM.height) + Style.spacing.xs + Math.ceil(_metaFM.height))
 
   Item {
     id: thumbSlot
@@ -73,8 +108,10 @@ Item {
     // from nameCol.y does, and it is verified with a debug
     // overlay.
     y: nameCol.y + (nameText.height - height) / 2
-    width: Style.spacing.controlHeight
-    height: Style.spacing.controlHeight
+    // Icon slot shrinks with the row, or it would set the height itself and
+    // compact rows would not actually be shorter.
+    width: root.compact ? Math.ceil(_nameFM.height) : Style.spacing.controlHeight
+    height: root.compact ? Math.ceil(_nameFM.height) : Style.spacing.controlHeight
 
     Image {
       id: thumbImage
@@ -93,7 +130,7 @@ Item {
       text: "󰉋"
       fontFamily: Style.font.family
       fontSize: Style.font.iconLarge
-      color: root.highlighted ? Color.menu.selectedText : Color.menu.text
+      color: root.highlighted ? Color.menu.selectedText : root.typeColor
     }
 
     // Previously it was hidden with "!hasThumb", which decides by EXTENSION -- a
@@ -108,7 +145,7 @@ Item {
       text: root.fileIconGlyph
       fontFamily: Style.font.family
       fontSize: Style.font.iconLarge
-      color: root.highlighted ? Color.menu.selectedText : Color.menu.text
+      color: root.highlighted ? Color.menu.selectedText : root.typeColor
     }
 
     // Broken symlink (md-link_variant_off, verified against the
@@ -146,13 +183,13 @@ Item {
       font.weight: Font.Medium
       color: root.isBroken ? Color.urgent
         : root.dimmed ? Qt.darker(Color.menu.text, 1.6)
-        : (root.highlighted ? Color.menu.selectedText : Color.menu.text)
+        : (root.highlighted ? Color.menu.selectedText : root.typeColor)
       elide: Text.ElideRight
     }
 
     Text {
       id: metaTextItem
-      visible: root.metaText.length > 0
+      visible: !root.compact && root.metaText.length > 0
       width: parent.width
       text: root.metaText
       font.pixelSize: Style.font.bodySmall

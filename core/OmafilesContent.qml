@@ -23,6 +23,9 @@ Item {
   property real measuredRowHeight: 0
   property string actionBusyDots: ""
   property var pendingDeleteNames: []
+  // Set alongside pendingDeleteNames when the request was Shift+D: same
+  // confirm flow, different wording and a different action on confirm.
+  property bool pendingDeletePermanent: false
   property bool gPending: false
 
   readonly property bool hasPendingEdit: EditModeState.renamingIndex >= 0 || EditModeState.creatingFolder || EditModeState.creatingFile || EditModeState.editingPath

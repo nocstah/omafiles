@@ -84,6 +84,12 @@ public:
     bool isSymlink = false;
     qint64 size = 0;
     qint64 mtime = 0;
+    // For the linemode cycle (yazi's `m`): permissions as an ls-style string
+    // and the owning user's name. Both are derived in the scan thread from
+    // the stat we already do, so they cost no extra syscall per entry —
+    // owner needs a getpwuid, which is cached by uid.
+    QString perms;
+    QString owner;
   };
 
   // Launches the ASYNCHRONOUS listing of `path`. `showHidden` includes

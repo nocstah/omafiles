@@ -299,13 +299,33 @@ Item {
     if (ArchiveState.inArchive) return
     var names = SelectionState.selectedEntries().map(function (e) { return e.name })
     if (names.length === 0) return
+    root.pendingDeletePermanent = false
+    root.pendingDeleteNames = names
+  }
+
+  // Shift+D: skip the trash entirely. Same confirmation as trash — it is the
+  // dialog text that changes, not the safety — but there is no undo to push
+  // afterwards, so none is registered.
+  function requestDeletePermanent() {
+    if (ArchiveState.inArchive) return
+    if (NavState.currentPath === Paths.trashDir) { requestDelete(); return }
+    var names = SelectionState.selectedEntries().map(function (e) { return e.name })
+    if (names.length === 0) return
+    root.pendingDeletePermanent = true
     root.pendingDeleteNames = names
   }
 
   function confirmDelete() {
     var names = root.pendingDeleteNames
+    var permanent = root.pendingDeletePermanent
     root.pendingDeleteNames = []
+    root.pendingDeletePermanent = false
     if (names.length === 0) return
+    if (permanent && NavState.currentPath !== Paths.trashDir) {
+      // No undo entry: there is nothing to restore from.
+      runNativeRemove(names.map(function (n) { return Utils.joinPath(NavState.currentPath, n) }), "", false)
+      return
+    }
     if (NavState.currentPath === Paths.trashDir) {
       // NATIVE permanent delete: FileOperations.remove instead
       // of `rm -rf`/`rm -f`. No undo possible. TrashState.trashInfo (see
@@ -348,20 +368,30 @@ Item {
 
   // --- ClipboardOps ---
 
+  // Marks + the current selection, deduped. Marks are absolute paths from
+  // other folders; the selection is here and now.
+  function _selectionPaths() {
+    var paths = SelectionState.selectedEntries().map(function (e) {
+      return Utils.entryPath(NavState.currentPath, e)
+    })
+    SelectionState.markedList().forEach(function (p) { if (paths.indexOf(p) < 0) paths.push(p) })
+    return paths
+  }
+
   function copySelected() {
     if (ArchiveState.inArchive) return
-    var entries = SelectionState.selectedEntries()
+    var entries = _selectionPaths()
     if (entries.length === 0) return
-    ClipboardState.clipboardPaths = entries.map(function (e) { return Utils.entryPath(NavState.currentPath, e) })
+    ClipboardState.clipboardPaths = entries
     ClipboardState.clipboardMode = "copy"
     syncClipboardToSystem()
   }
 
   function cutSelected() {
     if (ArchiveState.inArchive) return
-    var entries = SelectionState.selectedEntries()
+    var entries = _selectionPaths()
     if (entries.length === 0) return
-    ClipboardState.clipboardPaths = entries.map(function (e) { return Utils.entryPath(NavState.currentPath, e) })
+    ClipboardState.clipboardPaths = entries
     ClipboardState.clipboardMode = "cut"
     syncClipboardToSystem()
   }

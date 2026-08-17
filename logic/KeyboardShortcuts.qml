@@ -106,22 +106,58 @@ Item {
     // results just like over any listing (req 7).
     if (EditModeState.creatingFolder || EditModeState.creatingFile || EditModeState.renamingIndex >= 0 || EditModeState.editingPath) return
 
-    var extend = (event.modifiers & Qt.ShiftModifier) !== 0
+    // Visual mode extends exactly like a held Shift, so every range path
+    // below (j/k, arrows, selectRange) picks it up for free.
+    var extend = (event.modifiers & Qt.ShiftModifier) !== 0 || SelectionState.visualMode
+
+    // g-prefix jumps (yazi): `g` then a letter. This MUST resolve before the
+    // plain-letter chain below, or `gd` would trash the selection via `d` and
+    // `gp` would paste. A `g` followed by anything unmapped just cancels.
+    if (hostRoot && hostRoot.gPending && event.key !== Qt.Key_G && event.modifiers === Qt.NoModifier) {
+      hostRoot.gPending = false
+      var gTargets = {}
+      gTargets[Qt.Key_H] = Paths.homeDir
+      gTargets[Qt.Key_D] = Paths.homeDir + "/Downloads"
+      gTargets[Qt.Key_O] = Paths.homeDir + "/Documents"
+      gTargets[Qt.Key_C] = Paths.homeDir + "/.config"
+      gTargets[Qt.Key_P] = Paths.homeDir + "/Projects"
+      gTargets[Qt.Key_M] = Paths.homeDir + "/Music"
+      gTargets[Qt.Key_I] = Paths.homeDir + "/Pictures"
+      gTargets[Qt.Key_V] = Paths.homeDir + "/Videos"
+      gTargets[Qt.Key_T] = Paths.trashDir
+      gTargets[Qt.Key_R] = "/"
+      var gDest = gTargets[event.key]
+      if (gDest !== undefined) {
+        if (hostControllers && hostControllers.navController) hostControllers.navController.navigateTo(gDest)
+        event.accepted = true
+        return
+      }
+    }
 
     // Shift+Return: Open terminal here
     if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && (event.modifiers & Qt.ShiftModifier)) {
       Backend.TerminalResolver.launchTerminal(NavState.currentPath)
       event.accepted = true
     } else if (event.key === Qt.Key_Escape) {
-      if (NavState.searching) { if (hostControllers && hostControllers.searchOps) hostControllers.searchOps.exitSearch() }
-      else if (PreviewState.previewOpen) PreviewState.previewOpen = false
+      if (SelectionState.visualMode) SelectionState.visualMode = false
+      else if (SelectionState.markedCount > 0) SelectionState.clearMarks()
+      else if (NavState.searching) { if (hostControllers && hostControllers.searchOps) hostControllers.searchOps.exitSearch() }
+      // NOTE: Escape used to close the preview here. That made sense when the
+      // preview was a thing you summoned with Space; now that it is the third
+      // pane of the default layout, Escape collapsing it means the layout
+      // falls apart whenever you back out of a filter or visual mode — and it
+      // is not obvious how to get it back. Space still toggles it.
       else if (PickerState.active) { if (hostRoot) hostRoot.cancelPicker() }
       else if (TabsState.tabs.length > 1) { if (hostControllers && hostControllers.tabOps) hostControllers.tabOps.closeTab() }
       event.accepted = true
-    } else if (event.key === Qt.Key_Backspace || (event.key === Qt.Key_H && event.modifiers === Qt.NoModifier)) {
+    } else if (event.key === Qt.Key_Backspace || ((event.key === Qt.Key_H || event.key === Qt.Key_Left) && event.modifiers === Qt.NoModifier)) {
+      // Key_Left mirrors h (yazi-style: left leaves the folder). The
+      // NoModifier guard is load-bearing -- this branch runs BEFORE the
+      // Alt+Left history branch below, so without it Alt+Left would go up a
+      // directory instead of back in history.
       if (hostControllers && hostControllers.navController) hostControllers.navController.goUp()
       event.accepted = true
-    } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || (event.key === Qt.Key_L && event.modifiers === Qt.NoModifier)) {
+    } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || ((event.key === Qt.Key_L || event.key === Qt.Key_Right) && event.modifiers === Qt.NoModifier)) {
       if (SelectionState.selectedIndex >= 0 && hostControllers && hostControllers.navController) hostControllers.navController.enter(NavState.visibleEntries[SelectionState.selectedIndex])
       event.accepted = true
     } else if (event.key === Qt.Key_Space) {
@@ -147,15 +183,16 @@ Item {
       var down = Math.min(NavState.visibleEntries.length - 1, SelectionState.selectedIndex + 1)
       if (extend) { if (true) SelectionState.selectRange(down) }
       else { if (true) SelectionState.selectOnly(down) }
-      hostListView.positionViewAtIndex(down, ListView.Contain)
+      hostListView.positionWithScrolloff(down)
       event.accepted = true
     } else if (event.key === Qt.Key_Up || (event.key === Qt.Key_K && event.modifiers === Qt.NoModifier)) {
       var up = Math.max(0, SelectionState.selectedIndex - 1)
       if (extend) { if (true) SelectionState.selectRange(up) }
       else { if (true) SelectionState.selectOnly(up) }
-      hostListView.positionViewAtIndex(up, ListView.Contain)
+      hostListView.positionWithScrolloff(up)
       event.accepted = true
     } else if (event.key === Qt.Key_A && (event.modifiers & Qt.ControlModifier) && (event.modifiers & Qt.ShiftModifier)) {
+      SelectionState.clearMarks()
       if (true) SelectionState.selectNone()
       event.accepted = true
     } else if (event.key === Qt.Key_A && (event.modifiers & Qt.ControlModifier)) {
@@ -226,6 +263,76 @@ Item {
       event.accepted = true
     } else if (event.key === Qt.Key_Z && (event.modifiers & Qt.ControlModifier)) {
       if (hostControllers && hostControllers.actionEngine) hostControllers.actionEngine.undoLast()
+      event.accepted = true
+
+    // ---- yazi muscle memory: unmodified keys, all previously unbound -------
+    // Deliberately aliases rather than replacements — Ctrl+C/X/V and Delete
+    // still work, so nothing a mouse-driven user relies on moves.
+    } else if (event.key === Qt.Key_Y && event.modifiers === Qt.NoModifier) {
+      if (hostControllers && hostControllers.actionEngine) hostControllers.actionEngine.copySelected()
+      event.accepted = true
+    } else if (event.key === Qt.Key_X && event.modifiers === Qt.NoModifier) {
+      if (hostControllers && hostControllers.actionEngine) hostControllers.actionEngine.cutSelected()
+      event.accepted = true
+    } else if (event.key === Qt.Key_P && (event.modifiers & Qt.ShiftModifier)) {
+      // yazi mode on/off: sidebar out, parent + preview in, ratios locked to
+      // 2/3/4. One switch, because the three columns only make sense together
+      // — toggling them separately just produced a four-pane hybrid.
+      NavState.yaziMode = !NavState.yaziMode
+      if (NavState.yaziMode) {
+        NavState.parentColumnOpen = true
+        PreviewState.previewOpen = true
+      } else {
+        // Leaving the mode has to put the columns away too. Only restoring
+        // the sidebar left the parent column and preview standing, so "off"
+        // looked like yazi mode with a sidebar bolted on and the two states
+        // were indistinguishable.
+        NavState.parentColumnOpen = false
+        PreviewState.previewOpen = false
+      }
+      event.accepted = true
+    } else if (event.key === Qt.Key_P && event.modifiers === Qt.NoModifier) {
+      if (hostControllers && hostControllers.actionEngine) hostControllers.actionEngine.paste()
+      event.accepted = true
+    } else if (event.key === Qt.Key_D && (event.modifiers & Qt.ShiftModifier)) {
+      // Permanent delete. Goes through the SAME confirm dialog as trash — the
+      // dialog just says so — because this one has no undo.
+      if (hostControllers && hostControllers.actionEngine) hostControllers.actionEngine.requestDeletePermanent()
+      event.accepted = true
+    } else if (event.key >= Qt.Key_1 && event.key <= Qt.Key_9 && event.modifiers === Qt.NoModifier) {
+      // Jump straight to a tab, like yazi's 1-9.
+      var wanted = event.key - Qt.Key_1
+      if (wanted < TabsState.tabs.length && wanted !== TabsState.activeTabIndex) {
+        if (hostControllers && hostControllers.tabOps) hostControllers.tabOps.switchToTab(wanted)
+      }
+      event.accepted = true
+    } else if (event.key === Qt.Key_D && event.modifiers === Qt.NoModifier) {
+      // Trash, not unlink — same path as the Delete key, so it still goes
+      // through the confirm dialog and stays undoable.
+      if (hostControllers && hostControllers.actionEngine) hostControllers.actionEngine.requestDelete()
+      event.accepted = true
+    } else if (event.key === Qt.Key_Period && event.modifiers === Qt.NoModifier) {
+      if (hostControllers && hostControllers.searchOps) hostControllers.searchOps.toggleHidden()
+      event.accepted = true
+    } else if (event.key === Qt.Key_F && event.modifiers === Qt.NoModifier) {
+      if (hostControllers && hostControllers.searchOps) hostControllers.searchOps.startFilter()
+      event.accepted = true
+    } else if (event.key === Qt.Key_Z && event.modifiers === Qt.NoModifier) {
+      if (hostControllers && hostControllers.searchOps) hostControllers.searchOps.startZoxide()
+      event.accepted = true
+    } else if (event.key === Qt.Key_M && event.modifiers === Qt.NoModifier) {
+      // yazi's linemode cycle: none -> meta -> perms -> owner.
+      NavState.cycleLineMode()
+      event.accepted = true
+    } else if (event.key === Qt.Key_V && event.modifiers === Qt.NoModifier) {
+      // Sticky range selection. Anchor where the cursor is now, so the first
+      // j/k already extends from the right row.
+      if (SelectionState.visualMode) {
+        SelectionState.visualMode = false
+      } else {
+        SelectionState.visualMode = true
+        SelectionState.anchorIndex = SelectionState.selectedIndex
+      }
       event.accepted = true
     }
   }

@@ -37,7 +37,10 @@ Item {
       // ---------- Sidebar: pinned shortcuts ----------
       Sidebar {
         id: sidebar
-        width: 170
+        // Chrome, not a navigation column: it has no place in the cascade, and
+        // with it up the window showed FOUR panes.
+        visible: !NavState.yaziMode
+        width: NavState.yaziMode ? 0 : 170
         height: parent.height
         bookmarks: BookmarksState.bookmarks
         recentFiles: BookmarksState.recentFiles
@@ -210,9 +213,37 @@ Item {
             - (EditModeState.creatingFolder || EditModeState.creatingFile ? activeInputRows.height + mainColumn.spacing : 0)
             - (PickerState.active ? pickerBar.height : statusText.height) - mainColumn.spacing * (2 + (EditModeState.creatingFolder || EditModeState.creatingFile ? 1 : 0))
 
+          // Parent column (yazi's left column). Inside the active panel next
+          // to the list -- same place PreviewPanel splits into -- so it needs
+          // no changes to panelsRow slot maths, TabsState or hover-to-activate.
+          // Everything inside ActiveFileList (including the preview's 55/45
+          // split) keeps working untouched: it is all relative to the list,
+          // which is simply narrower now.
+          ParentColumn {
+            id: parentColumn
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            // In yazi mode the slot is UNCONDITIONAL: at /, inside an archive
+            // and in the trash there is no parent to list, but collapsing the
+            // column to zero reflowed the whole window and the other two panes
+            // jumped. The contract is a stable three-slot window — hold the
+            // slot, empty the content (ParentColumn.shown already gates that).
+            width: NavState.yaziMode
+              ? Math.round(parent.width * 2 / 9)
+              : (shown ? Math.round(parent.width * 0.22) : 0)
+            visible: width > 0
+            hostNavController: controllers ? controllers.navController : null
+            hostFileMeta: controllers ? controllers.fileMeta : null
+            Behavior on width { NumberAnimation { duration: 120 } }
+          }
+
           ActiveFileList {
             id: list
-            anchors.fill: parent
+            anchors.left: parentColumn.right
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
             root: mainLayout.root
             card: card
             controllers: mainLayout.controllers
@@ -224,19 +255,71 @@ Item {
         }
         } // end activeTop (Column)
 
+        // Which-key hint for the `g` prefix. yazi pops the continuations the
+        // moment you press a prefix, which is what makes its chords
+        // discoverable instead of memorised — we added g-jumps with no way to
+        // find them.
+        //
+        // An OVERLAY, not a column child: as a child it took real layout
+        // space, so appearing for a few hundred ms shoved the list down and
+        // pushed its last row under the status line. Floating over the panel
+        // costs the layout nothing and matches how yazi draws it.
+        Rectangle {
+          id: gHint
+          visible: mainLayout.root ? mainLayout.root.gPending : false
+          z: 50
+          anchors.left: activePanel.left
+          anchors.right: activePanel.right
+          anchors.bottom: activePanel.bottom
+          anchors.margins: Style.spacing.controlGap
+          height: gHintText.implicitHeight + Style.spacing.controlGap * 2
+          color: Color.menu.background
+          border.color: Color.menu.border
+          border.width: Style.spacing.hairline
+          radius: Style.cornerRadius > 0 ? Style.cornerRadius : 4
+
+          Text {
+            id: gHintText
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.margins: Style.spacing.controlGap
+            text: "g →  h home · d Downloads · o Documents · c config · p Projects · m Music · i Pictures · v Videos · t Trash · r /  ·  gg top"
+            color: Color.menu.text
+            font.pixelSize: Style.font.bodySmall
+            font.family: Style.font.family
+            wrapMode: Text.WordWrap
+            horizontalAlignment: Text.AlignHCenter
+          }
+        }
+
             Text {
               id: statusText
               anchors.bottom: parent.bottom
               anchors.left: parent.left
               anchors.right: parent.right
               visible: !PickerState.active
-              text: NavState.visibleEntries.length + (NavState.visibleEntries.length === 1 ? " item" : " items")
+              // Position and mode flags first, yazi-style: the states you can be
+              // in (visual, filter, hidden) must be visible without pressing
+              // anything, or they become invisible modes you discover by
+              // surprise. Position answers "how far down am I" the way yazi's
+              // n/N does.
+              text: (NavState.yaziMode ? "YAZI · " : "")
+                + (SelectionState.selectedIndex >= 0 && NavState.visibleEntries.length > 0
+                  ? (SelectionState.selectedIndex + 1) + "/" + NavState.visibleEntries.length + " · " : "")
+                + (SelectionState.visualMode ? "VISUAL · " : "")
+                + (NavState.filterOnly && NavState.searchQuery ? "FILTER · " : "")
+                + (NavState.showHidden ? "HIDDEN · " : "")
+                + NavState.visibleEntries.length + (NavState.visibleEntries.length === 1 ? " item" : " items")
                 + (NavState.searchQuery ? " of " + NavState.entries.length : "")
                 + (NavState.searchTruncated ? " · showing first 200" : "")
                 + (!NavState.searchQuery && NavState.entries.length > 5000 ? " · large folder, may be slow" : "")
                 + (SelectionState.selectedIndices.length > 1 ? " · " + SelectionState.selectedIndices.length + " selected" : "")
+                + (SelectionState.markedCount > 0 ? " · " + SelectionState.markedCount + " marked" : "")
                 + (ClipboardState.clipboardPaths.length > 0 ? " · clipboard: " + ClipboardState.clipboardPaths.length + (ClipboardState.clipboardPaths.length === 1 ? " item" : " items") + (ClipboardState.clipboardMode === "cut" ? " (cut)" : " (copied)") : "")
-                + " · sort: " + (controllers ? controllers.SortState.sortLabel() : "")
+                // "(s)" because the direction arrow alone reads like a key hint
+                // — it is the sort ORDER, not the shortcut.
+                + " · sort: " + (controllers ? controllers.SortState.sortLabel() : "") + " (s)"
               font.pixelSize: Style.font.subtitle
               font.family: Style.font.family
               color: Color.menu.text

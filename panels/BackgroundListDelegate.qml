@@ -78,6 +78,11 @@ CursorSurface {
     readonly property bool _isDir: modelData.type === "dir"
     function _requestCount(force) {
       if (!_isDir) return
+      // Compact mode draws no subtitle, so the count would never be seen:
+      // don't spawn the walk. FolderCounter stats every child of every visible
+      // folder, which on a big tree is the most expensive part of a listing.
+      if (!NavState.needsFolderCounts) return
+
       if (!force && !FolderCountState.needsRequest(myPath)) return
       FolderCountState.markPending(myPath)
       Backend.FolderCounter.request(myPath, NavState.showHidden)
@@ -100,11 +105,13 @@ CursorSurface {
       anchors.fill: parent
       name: modelData.name || ""
       isDir: modelData.type === "dir"
+      isSymlink: modelData.isSymlink === true
+      compact: NavState.compactMode
       isBroken: modelData.link === "broken"
       fileIconGlyph: Utils.iconFor(modelData)
       thumbSource: bgRowContent.imgThumb ? Util.fileUrl(bgRowContent.imgThumb)
         : (bgRowContent.vidThumb ? Util.fileUrl(bgRowContent.vidThumb) : "")
-      metaText: hostFileMeta ? hostFileMeta.metaFor(modelData, panelPath) : ""
+      metaText: hostFileMeta ? hostFileMeta.lineFor(modelData, panelPath) : ""
       metaTooltip: hostFileMeta ? hostFileMeta.metaTooltipFor(modelData, panelPath) : ""
     }
   }

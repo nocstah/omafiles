@@ -137,8 +137,15 @@ Item {
   function _restoreTabPreview(tab) {
     if (tab.previewOpen && tab.previewEntry) {
       previewLoader.loadPreview(tab.previewEntry)
-    } else {
+    } else if (tab.previewOpen === false) {
+      // Explicitly closed in that tab — respect it.
       PreviewState.previewOpen = false
+    } else {
+      // Open, or never recorded. The third pane is part of the layout now, so
+      // the absence of a saved entry must NOT close it: this branch used to
+      // force it shut, which silently defeated the default and left the app
+      // two-pane on every start.
+      PreviewState.previewOpen = true
     }
   }
 
