@@ -122,6 +122,15 @@ ThumbnailProvider::ThumbnailProvider(QObject *parent) : QObject(parent) {
     pruneCache();
 }
 
+ThumbnailProvider::~ThumbnailProvider() {
+  // Cut off the delivery of any in-flight generation: under the lock, mark it
+  // dead. A worker that has not delivered yet will see alive=false and will not
+  // do invokeMethod(this); one that already holds it blocks us here until it
+  // releases (instant delivery, it only posts an event).
+  std::lock_guard<std::mutex> lk(m_life->mtx);
+  m_life->alive = false;
+}
+
 bool ThumbnailProvider::supported(const QString &path) {
   const QString ext = QFileInfo(path).suffix().toLower();
   return kThumbExts.contains(ext);
@@ -207,9 +216,16 @@ QString ThumbnailProvider::request(const QString &path, int size) {
     return QString(); // already being generated
   m_inflight.insert(key);
 
+  auto life = m_life; // copy of the control block, outlives the singleton
   QThreadPool::globalInstance()->start(QRunnable::create(
-      [this, path, size, outPath, key]() {
+      [this, life, path, size, outPath, key]() {
         const bool ok = generate(path, size, outPath);
+        // Safe delivery: the destructor takes this same lock, so either we see
+        // alive=false (and do not touch the dead singleton) or we hold it and
+        // the destructor waits for us to release.
+        std::lock_guard<std::mutex> lk(life->mtx);
+        if (!life->alive)
+          return;
         QMetaObject::invokeMethod(
             this,
             [this, path, outPath, key, ok]() {

@@ -52,17 +52,23 @@ signals:
   void results(const QVariantList &entries, bool truncated);
 
 private:
-  // Generation of the active search. search() increments and captures it;
-  // the worker discards (does not emit) if it stopped being the active one --
-  // covers both cancel() and a search that supersedes another.
-  std::atomic<quint64> m_gen{0};
-
   // Life guard against the dangling `this` (same pattern as
   // DirectoryModel/FileOperations): a worker that finishes after the object is
-  // destroyed would check `alive` under the mutex before delivering.
+  // destroyed must not deliver. The worker takes the lock and only invokes if
+  // alive is still true; the destructor takes the same lock and sets it to
+  // false, so they never coincide.
+  //
+  // `gen` lives HERE, not as a member of the object: the walk polls it on every
+  // entry to honour cancellation, and a poll of a member would dereference an
+  // already-destroyed SearchWorker (a tab closed mid-search). In the shared
+  // control block it outlives the object and the worker never touches `this`
+  // until the alive check has passed. search() increments and captures it; the
+  // worker discards (does not emit) if it stopped being the active one --
+  // covers both cancel() and a search that supersedes another.
   struct Life {
     std::mutex mtx;
     bool alive = true;
+    std::atomic<quint64> gen{0};
   };
   std::shared_ptr<Life> m_life = std::make_shared<Life>();
 };

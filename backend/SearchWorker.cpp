@@ -15,12 +15,12 @@ SearchWorker::~SearchWorker() {
   m_life->alive = false;
 }
 
-void SearchWorker::cancel() { m_gen.fetch_add(1); }
+void SearchWorker::cancel() { m_life->gen.fetch_add(1); }
 
 void SearchWorker::search(const QString &root, const QString &query,
                           bool showHidden) {
   // Invalidates any previous search and opens this one's generation.
-  const quint64 gen = m_gen.fetch_add(1) + 1;
+  const quint64 gen = m_life->gen.fetch_add(1) + 1;
   if (query.isEmpty())
     return;
 
@@ -48,7 +48,7 @@ void SearchWorker::search(const QString &root, const QString &query,
     QVariantList out;
     while (it.hasNext()) {
       // Cancelled or superseded by another search -> abort without emitting.
-      if (m_gen.load() != gen)
+      if (life->gen.load() != gen)
         return;
       it.next();
       const QFileInfo fi = it.fileInfo();
@@ -75,13 +75,19 @@ void SearchWorker::search(const QString &root, const QString &query,
     if (truncated)
       out.erase(out.begin() + 200, out.end());
 
+    // Safe delivery: the destructor takes this same lock, so either we see
+    // alive=false (and do not touch the dead object) or we hold it and the
+    // destructor waits for us to release. The check belongs HERE, on the
+    // worker, and NOT inside the delivered lambda: invokeMethod() itself
+    // dereferences `this` to find its thread, so checking after the call has
+    // already crashed (SIGSEGV in QObject::thread()).
+    std::lock_guard<std::mutex> lk(life->mtx);
+    if (!life->alive)
+      return;
     QMetaObject::invokeMethod(
         this,
         [this, life, gen, out, truncated]() {
-          std::lock_guard<std::mutex> lk(life->mtx);
-          if (!life->alive)
-            return;
-          if (m_gen.load() != gen)
+          if (life->gen.load() != gen)
             return; // superseded while delivering
           emit results(out, truncated);
         },
@@ -91,7 +97,7 @@ void SearchWorker::search(const QString &root, const QString &query,
 
 void SearchWorker::searchContent(const QString &root, const QString &query,
                                  bool showHidden) {
-  const quint64 gen = m_gen.fetch_add(1) + 1;
+  const quint64 gen = m_life->gen.fetch_add(1) + 1;
   if (query.isEmpty())
     return;
 
@@ -112,7 +118,7 @@ void SearchWorker::searchContent(const QString &root, const QString &query,
     constexpr qint64 kMaxFileSize = 5LL * 1024 * 1024; // 5 MB limit
 
     while (it.hasNext()) {
-      if (m_gen.load() != gen)
+      if (life->gen.load() != gen)
         return;
 
       it.next();
@@ -151,7 +157,7 @@ void SearchWorker::searchContent(const QString &root, const QString &query,
       int lineNo = 0;
 
       while (!in.atEnd()) {
-        if (m_gen.load() != gen) {
+        if (life->gen.load() != gen) {
           file.close();
           return;
         }
@@ -192,13 +198,15 @@ void SearchWorker::searchContent(const QString &root, const QString &query,
     if (truncated)
       out.erase(out.begin() + 200, out.end());
 
+    // Safe delivery on the worker, before invokeMethod touches `this`
+    // (see search()).
+    std::lock_guard<std::mutex> lk(life->mtx);
+    if (!life->alive)
+      return;
     QMetaObject::invokeMethod(
         this,
         [this, life, gen, out, truncated]() {
-          std::lock_guard<std::mutex> lk(life->mtx);
-          if (!life->alive)
-            return;
-          if (m_gen.load() != gen)
+          if (life->gen.load() != gen)
             return;
           emit results(out, truncated);
         },

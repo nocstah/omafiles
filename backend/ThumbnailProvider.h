@@ -4,6 +4,8 @@
 #include <QObject>
 #include <QSet>
 #include <QString>
+#include <memory>
+#include <mutex>
 #include <qqmlregistration.h>
 
 // C++ backend for thumbnails. Generates thumbnails of images
@@ -32,6 +34,7 @@ class ThumbnailProvider : public QObject {
 
 public:
   explicit ThumbnailProvider(QObject *parent = nullptr);
+  ~ThumbnailProvider() override;
 
   // Path of the thumbnail of `path` (max side `size` px) if it is already in
   // the cache; if not, "" and it generates it async -> ready(path, thumbPath).
@@ -81,4 +84,19 @@ private:
 
   QString m_cacheDir;
   QSet<QString> m_inflight; // keys being generated right now (dedup)
+
+  // Life guard against the dangling `this` (same pattern as
+  // DirectoryModel/FileOperations, Phase 10.A/13.B). generate() is static and
+  // safe on its own, but the DELIVERY of the result does invokeMethod(this):
+  // a worker that finishes AFTER the singleton is destroyed (the portal
+  // picker answering and tearing down the engine mid-thumbnail is the common
+  // case) would dereference a dead QObject -> SIGSEGV in QObject::thread().
+  // The worker takes the lock and only invokes if alive is still true; the
+  // destructor takes the same lock and sets it to false, so they never
+  // coincide.
+  struct Life {
+    std::mutex mtx;
+    bool alive = true;
+  };
+  std::shared_ptr<Life> m_life = std::make_shared<Life>();
 };
