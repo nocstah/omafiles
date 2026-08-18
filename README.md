@@ -1,3 +1,9 @@
+> **This is a fork.** Upstream is [Percius04/omafiles](https://github.com/Percius04/omafiles);
+> this tree adds a yazi-shaped navigation layer on the [`noc`](../../tree/noc) branch —
+> parent column, scrolloff, marks, cursor memory, zoxide jump, and a set of bindings on
+> keys upstream leaves free. All additive; every stock shortcut still works.
+> **See [FORK.md](FORK.md).** The rest of this README is upstream's.
+
 # Omafiles
 
 A keyboard-first **multi-panel** file manager for [Omarchy](https://omarchy.org), built as a **Qt6 standalone application** (`v1.1.0`). It is not a wrapper around Nautilus/Dolphin/Thunar, and not a layer-shell popup either — it's a real, tileable window that opens and behaves like any other app on your desktop, using Omarchy's own design system (`qs.Commons`/`qs.Ui`) end to end: same typography, same borders, same hover/selection chrome, same Nerd Font icons as the rest of the shell.
