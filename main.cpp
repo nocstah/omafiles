@@ -6,6 +6,14 @@
 #include <QImage>
 #include <QLocalServer>
 #include <QLocalSocket>
+
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
+
+#include <cstdlib>
+#include <cstring>
+#include <string>
 #include <QPageSize>
 #include <QPainter>
 #include <QPdfWriter>
@@ -356,26 +364,66 @@ int runSelfCheck(int argc, char *argv[]) {
   return rc; // tmp is destroyed (and cleaned) on returning from main.
 }
 
+// Hands `wire` to an already-running instance WITHOUT touching Qt, using the
+// same socket QLocalServer creates for instanceSocketName() -- QDir::tempPath()
+// + "/" + name on Unix. Returns true if a listener took it.
+//
+// Why this exists as a raw socket instead of just calling
+// SingleInstance::deliverToRunning() earlier: that needs a QGuiApplication, and
+// constructing one costs ~0.45s on this machine (platform plugin, Wayland
+// connection, fontconfig) -- all of it wasted for an invocation whose entire
+// job is to write one string to a socket and exit. Doing it before any Qt
+// initialisation takes a forwarded launch from ~0.5s to a few milliseconds,
+// which is the difference between "the file manager opens" and "the file
+// manager is already there". The Qt path stays as the fallback below.
+bool deliverToRunningFast(const QByteArray &wire) {
+  const char *tmpdir = std::getenv("TMPDIR");
+  std::string path(tmpdir && *tmpdir ? tmpdir : "/tmp");
+  while (!path.empty() && path.back() == '/') path.pop_back();
+  path += "/omafiles-instance-" + std::to_string(static_cast<unsigned>(getuid()));
+
+  struct sockaddr_un addr;
+  std::memset(&addr, 0, sizeof(addr));
+  if (path.size() >= sizeof(addr.sun_path)) return false;
+  addr.sun_family = AF_UNIX;
+  std::memcpy(addr.sun_path, path.c_str(), path.size());
+
+  const int fd = ::socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+  if (fd < 0) return false;
+  // A stale socket file left by a killed instance refuses the connection, so
+  // this correctly falls through to becoming the new server.
+  if (::connect(fd, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr)) != 0) {
+    ::close(fd);
+    return false;
+  }
+  const char *p = wire.constData();
+  qsizetype left = wire.size();
+  bool ok = true;
+  while (left > 0) {
+    const ssize_t n = ::write(fd, p, static_cast<size_t>(left));
+    if (n <= 0) { ok = false; break; }
+    p += n;
+    left -= n;
+  }
+  ::close(fd); // flushes; the peer sees readyRead then disconnected
+  return ok;
+}
+
 int runNormal(int argc, char *argv[]) {
-  QGuiApplication app(argc, argv);
-  app.setApplicationName(QStringLiteral("omafiles"));
-  // Wayland app_id = "omafiles" (kept on purpose: any
-  // Hyprland windowrule with class:omafiles keeps working). The installed
-  // .desktop has a different basename (io.github.percius04.omafiles, mandatory
-  // for D-Bus activation), so it is matched to this window via
-  // StartupWMClass=omafiles in the .desktop itself -> the dock/taskbar resolves
-  // Icon=omafiles without changing the app_id.
-
-
+  // Argument parsing happens BEFORE QGuiApplication is constructed, so that a
+  // forwarding invocation can hand its payload over and exit without paying
+  // for Qt's GUI stack at all (see deliverToRunningFast). QString/QFileInfo
+  // need no application instance, so normalizePayload() is safe this early.
+  //
   // First positional argument = path/URI/payload to open (empty = normal
   // start, which restores the previous session ).
   // --preload: become the single-instance server WITHOUT showing a window, so
   // the expensive part of startup (fontconfig, the QML engine, the mount scan)
   // is already paid before the user asks for anything. A later `omafiles
-  // <path>` then travels the socket path -- measured ~0.09s, against ~1.2s for
-  // a cold start -- and app/Main.qml's SingleInstance.onReceived handler shows
-  // the window that was sitting hidden. Meant to be run once per session from
-  // the systemd user unit (packaging/omafiles-preload.service).
+  // <path>` then travels the socket path instead of cold-starting, and
+  // app/Main.qml's SingleInstance.onReceived handler shows the window that was
+  // sitting hidden. Meant to be run once per session from the systemd user
+  // unit (packaging/omafiles-preload.service).
   bool preload = false;
   QString payload;
   for (int i = 1; i < argc; ++i) {
@@ -388,6 +436,26 @@ int runNormal(int argc, char *argv[]) {
 
   // Check if this is a file-chooser picker payload
   const bool isPicker = payload.contains(QLatin1String("picker:"));
+
+  // Fast single-instance handoff, before any Qt GUI initialisation.
+  // A bare `omafiles` (dock icon, launcher) has an EMPTY payload, and writing
+  // zero bytes would never wake the peer's readyRead -- the running instance
+  // would simply never come forward. So an empty payload goes over the wire as
+  // a lone \x1e, which app/Main.qml treats as "no path, just show yourself".
+  if (!isPicker && !preload) {
+    const QByteArray wire =
+        payload.isEmpty() ? QByteArrayLiteral("\x1e") : payload.toUtf8();
+    if (deliverToRunningFast(wire)) return 0;
+  }
+
+  QGuiApplication app(argc, argv);
+  app.setApplicationName(QStringLiteral("omafiles"));
+  // Wayland app_id = "omafiles" (kept on purpose: any
+  // Hyprland windowrule with class:omafiles keeps working). The installed
+  // .desktop has a different basename (io.github.percius04.omafiles, mandatory
+  // for D-Bus activation), so it is matched to this window via
+  // StartupWMClass=omafiles in the .desktop itself -> the dock/taskbar resolves
+  // Icon=omafiles without changing the app_id.
 
   if (isPicker) {
     app.setDesktopFileName(QStringLiteral("omafiles-picker"));
