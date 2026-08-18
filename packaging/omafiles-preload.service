@@ -1,0 +1,38 @@
+[Unit]
+# Warms Omafiles at login so launches from other apps are instant.
+#
+# Without this, `omafiles <path>` from xdg-open / "Show in file manager" /
+# a .desktop launch costs a full cold start (~1.2s on this machine: fontconfig
+# init, the QML engine, and the startup mount scan) whenever no window happens
+# to be open. With it, the first instance is already running and every later
+# launch is delivered over the single-instance socket instead -- measured
+# ~0.09s, an order of magnitude quicker.
+#
+# --preload keeps the window hidden until something actually asks for it, so
+# the warm instance costs a process, not a window on your desktop.
+#
+# Install:
+#   cp packaging/omafiles-preload.service ~/.config/systemd/user/
+#   systemctl --user enable --now omafiles-preload.service
+#
+# NOTE: this does not speed up the xdg-desktop-portal FileChooser (Save/Open
+# dialogs). Those deliberately bypass the single instance -- see the isPicker
+# guard in main.cpp -- because the portal helper treats the launched process
+# exiting as "dialog cancelled", so a forwarding stub that exits immediately
+# would cancel the request.
+Description=Omafiles preloaded file manager instance
+Documentation=https://github.com/Percius04/omafiles
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/omafiles --preload
+Restart=on-failure
+RestartSec=5
+# It is a warm cache, not a critical service: never let a restart loop spin.
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Install]
+WantedBy=graphical-session.target

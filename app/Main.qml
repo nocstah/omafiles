@@ -19,7 +19,11 @@ import "."
 // `shell` object.
 ApplicationWindow {
   id: window
-  visible: true
+  // Hidden under --preload: the engine warms up in the background and the
+  // window appears the moment a payload arrives (SingleInstance.onReceived
+  // below already calls show/raise/requestActivate). Any other start is
+  // visible immediately, exactly as before.
+  visible: typeof omafilesPreload === "undefined" || !omafilesPreload
   // Default size of the first opening; HostAdapter overrides it if
   // there is a saved window.json (see onSizeRestored).
   width: 1400
