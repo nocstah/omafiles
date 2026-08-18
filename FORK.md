@@ -92,9 +92,24 @@ cp packaging/omafiles-preload.service ~/.config/systemd/user/
 systemctl --user enable --now omafiles-preload.service
 ```
 
-Measured here: a cold start costs ~1.2–1.6s (fontconfig init, the QML engine, and
-a startup `lsblk`/`findmnt` mount scan); a launch delivered to a running instance
-is a fraction of that.
+Three things had to change for that to actually feel instant, because a warm
+instance alone was not enough:
+
+- the forwarding invocation used to construct a whole `QGuiApplication` — Wayland
+  connection, platform plugin, fontconfig — just to write one string to a socket
+  and exit. It now hands over via a raw `AF_UNIX` write before any Qt GUI init.
+- a preloaded window that is never shown has no scene graph and no Wayland
+  surface, so the first `show()` paid for all of it. It is shown once at startup
+  and pulled back on its first frame.
+- opening the folder ran *before* the window reached the screen, and the
+  compositor shows nothing until the first frame arrives. The path is now opened
+  from `onFrameSwapped`, so the window appears first and fills in immediately
+  after.
+
+Measured on a real session by polling `hyprctl clients` for the window actually
+appearing: **~0.41–0.45s**, from ~1.24s with preload alone and a cold start of
+~1.2–1.6s (fontconfig init, the QML engine, and a startup `lsblk`/`findmnt` mount
+scan).
 
 This does **not** speed up the xdg-desktop-portal Save/Open dialogs. Those bypass
 the single instance by design — the portal helper treats the launched process
