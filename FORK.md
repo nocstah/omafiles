@@ -92,6 +92,11 @@ cp packaging/omafiles-preload.service ~/.config/systemd/user/
 systemctl --user enable --now omafiles-preload.service
 ```
 
+Closing the window on a preloaded instance **hides** it instead of quitting, so
+the process stays warm for the next launch. Without that, the first launch after
+any close paid a full cold start again — and since quitting is a *clean* exit,
+`Restart=on-failure` never brought it back either, so it stayed cold from then on.
+
 Three things had to change for that to actually feel instant, because a warm
 instance alone was not enough:
 
