@@ -42,6 +42,10 @@ QtObject {
     var NAMED_KEYS = {
       "return": Qt.Key_Return, "backspace": Qt.Key_Backspace, "space": Qt.Key_Space,
       "/": Qt.Key_Slash, ":": Qt.Key_Colon, "?": Qt.Key_Question, "\\": Qt.Key_Backslash,
+      // "." must be here, not fall through to qtKeyFor()'s single-letter
+      // arithmetic below: that computes Qt.Key_A + (charCode - 'a'), which for
+      // "." is Qt.Key_A - 51, a nonsense key code that resolves to null.
+      ".": Qt.Key_Period,
       "down": Qt.Key_Down, "up": Qt.Key_Up, "left": Qt.Key_Left, "right": Qt.Key_Right,
       "f2": Qt.Key_F2, "f5": Qt.Key_F5, "delete": Qt.Key_Delete, "tab": Qt.Key_Tab
     }
@@ -98,12 +102,19 @@ QtObject {
     // "into a level" pair) -- all four are real, independently rebindable
     // actions. Picks keys that don't collide with any OTHER default.
     sc.add("Keybindings: custom navigation (all 4 directions) via config file, zero code changes", function (done) {
-      writeKb('[keybindings]\nmove_down = "n"\nmove_up = "e"\ngo_up = "m"\nopen = "i"\n', function (w) {
+      // NOTE (local yazi branch): upstream picks "m" for go_up here, chosen so
+      // it collides with no other default. On this branch "m" IS a default --
+      // cycle_linemode -- so that override would be rejected as a conflict and
+      // the test would fail for a reason that has nothing to do with what it
+      // is testing. "u" is free of every default on this branch, and keeps the
+      // test's actual intent intact: four directions rebound from config, and
+      // the old defaults going dead afterwards.
+      writeKb('[keybindings]\nmove_down = "n"\nmove_up = "e"\ngo_up = "u"\nopen = "i"\n', function (w) {
         if (w.exitCode !== 0) { done(false, "couldn't write config: " + w.stderr); return }
         reload()
         var r = resolver()
         var checks = [
-          ["n", "none", "move_down"], ["e", "none", "move_up"], ["m", "none", "go_up"], ["i", "none", "open"],
+          ["n", "none", "move_down"], ["e", "none", "move_up"], ["u", "none", "go_up"], ["i", "none", "open"],
           // full-replacement policy: the OLD default keys must stop working once overridden
           ["j", "none", null], ["down", "any", null], ["k", "none", null], ["up", "any", null],
           ["h", "none", null], ["backspace", "any", null], ["l", "none", null], ["return", "shift", "open_terminal"]
