@@ -24,15 +24,18 @@ Description=Omafiles preloaded file manager instance
 Documentation=https://github.com/Percius04/omafiles
 PartOf=graphical-session.target
 After=graphical-session.target
+# A warm cache must not be rate-limited out of existence by a few restarts.
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
 ExecStart=%h/.local/bin/omafiles --preload
-Restart=on-failure
-RestartSec=5
-# It is a warm cache, not a critical service: never let a restart loop spin.
-StartLimitIntervalSec=60
-StartLimitBurst=3
+# always, not on-failure: closing the window is a CLEAN exit, and on-failure
+# would leave nothing warm for the next launch. The window normally hides
+# rather than quits (see app/Main.qml onClosing), so this is the backstop for
+# a real crash or an explicit kill.
+Restart=always
+RestartSec=2
 
 [Install]
 WantedBy=graphical-session.target

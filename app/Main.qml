@@ -27,7 +27,8 @@ ApplicationWindow {
   // pulling it back on the first frameSwapped costs a brief flash at login and
   // makes every later launch instant.
   visible: true
-  property bool _preloadWarming: (typeof omafilesPreload !== "undefined" && omafilesPreload)
+  readonly property bool _isPreload: (typeof omafilesPreload !== "undefined" && omafilesPreload)
+  property bool _preloadWarming: window._isPreload
   // Payload waiting for the window to actually be on screen (see onReceived).
   property string _pendingPayload: ""
   onFrameSwapped: {
@@ -76,8 +77,17 @@ ApplicationWindow {
   // calling it here is essential, otherwise the session is never saved in the
   // standalone (Phase 25 regression: before this only set opened=false and
   // skipped the save, so session.json stayed frozen).
-  onClosing: {
+  onClosing: (close) => {
     content.close()
+    // A preloaded instance is a warm cache, not a window: closing it should put
+    // it away, not throw away the process. Quitting here meant the FIRST launch
+    // after any close paid a full cold start again -- and, because the exit is
+    // clean, systemd's Restart=on-failure never brought it back either.
+    if (window._isPreload) {
+      close.accepted = false
+      window.hide()
+      return
+    }
     Qt.quit()
   }
 
