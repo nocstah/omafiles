@@ -128,6 +128,13 @@ draws the result: counting stats every child of every visible folder. Measured o
 `shell.toml`. Every lookup falls back to the plain row colour, so a missing
 section degrades to upstream's look rather than breaking.
 
+**"New folder" in the file picker.** The portal Save/Choose-folder dialog
+grows the macOS button (`+ 󰉋`, next to Save) plus `Ctrl+Shift+N` working
+from inside the name field: it opens the same inline creation row the rest
+of the app uses, the freshly created folder is **entered automatically**
+(it's the destination — that's why you made it), and focus returns to the
+name field so Enter saves right there.
+
 ## Startup
 
 `omafiles --preload` becomes the single-instance server without showing a window,

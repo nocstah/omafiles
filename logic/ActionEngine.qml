@@ -996,6 +996,10 @@ Item {
       var name = actionEngine._nativeMkdirPending[path]
       if (name === undefined) return // another mkdir entirely: do not re-register
       delete actionEngine._nativeMkdirPending[path]
+      // Picker mode (save / choose-folder): a folder created from the bar is
+      // the DESTINATION -- enter it right away, the way a macOS save dialog
+      // does, instead of leaving it as one more row to double-click.
+      if (PickerState.active) navController.navigateTo(path)
       pushUndo("new folder \"" + name + "\"", function (onSettled) {
         // rmdir (not rm -rf): if there is already something inside, it fails instead of deleting it.
         return runAction("rmdir -- " + Util.shellQuote(path), undefined, onSettled)

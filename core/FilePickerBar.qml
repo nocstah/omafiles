@@ -17,6 +17,15 @@ Rectangle {
 
   signal responseSubmitted(string requestId, int responseCode, var results)
 
+  // For the macOS-style "New folder" button below -- the same inline
+  // creation row the rest of the app uses (Ctrl+Shift+N), which renders
+  // right above this bar even in picker mode.
+  property Item actionEngine: null
+
+  function startNewFolder() {
+    if (actionEngine) actionEngine.startNewFolder()
+  }
+
   function submit() {
     var uris = []
     if (PickerState.mode === "save-file") {
@@ -68,6 +77,18 @@ Rectangle {
     responseSubmitted(reqId, 1, [])
   }
 
+  // When the inline "new folder" row closes in save mode, focus must come
+  // back to the NAME field, not to the list (the input row hands focus to
+  // the list on hide -- right everywhere except mid-save). Qt.callLater so
+  // this runs after that hand-off rather than racing it.
+  Connections {
+    target: EditModeState
+    function onCreatingFolderChanged() {
+      if (!EditModeState.creatingFolder && PickerState.active && PickerState.mode === "save-file")
+        Qt.callLater(function () { saveFieldName.forceActiveFocus() })
+    }
+  }
+
   // Monitor suggestedName to keep the TextField updated
   Connections {
     target: PickerState
@@ -116,6 +137,15 @@ Rectangle {
         } else if (event.key === Qt.Key_Escape) {
           pickerBar.cancel()
           event.accepted = true
+        } else if (event.key === Qt.Key_N
+                   && (event.modifiers & Qt.ControlModifier)
+                   && (event.modifiers & Qt.ShiftModifier)) {
+          // Mirrors the DEFAULT new_folder binding so it also works while
+          // this field holds focus, the way Cmd+Shift+N does in a macOS
+          // save dialog. Hardcoded: the resolver lives with the list's key
+          // handler, and a remapped binding still has the button below.
+          pickerBar.startNewFolder()
+          event.accepted = true
         }
       }
     }
@@ -127,6 +157,23 @@ Rectangle {
     anchors.rightMargin: Style.spacing.panelPadding
     anchors.verticalCenter: parent.verticalCenter
     spacing: Style.spacing.controlGap
+
+    // macOS save dialogs have had this button forever, and it's the moment
+    // you most need one: mid-save, realizing the destination doesn't exist
+    // yet. Only where a folder is being created FOR the result (save /
+    // choose-folder) -- an open-file picker has no business creating dirs.
+    Button {
+      visible: PickerState.mode === "save-file" || PickerState.mode === "open-dir"
+      // "+ <folder>" instead of the words: the bar competes with the name
+      // field for width. Same glyph the rows use for directories; the
+      // accessible name keeps the words.
+      text: "+ 󰉋"
+      bordered: true
+      anchors.verticalCenter: parent.verticalCenter
+      Accessible.role: Accessible.Button
+      Accessible.name: "New folder"
+      onClicked: pickerBar.startNewFolder()
+    }
 
     Button {
       text: "Cancel"

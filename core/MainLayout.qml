@@ -389,6 +389,7 @@ Item {
               anchors.left: parent.left
               anchors.right: parent.right
               visible: PickerState.active
+              actionEngine: controllers ? controllers.actionEngine : null
               onResponseSubmitted: function(requestId, responseCode, results) {
                 var resultsJson = JSON.stringify(results)
                 Backend.Detached.run([
