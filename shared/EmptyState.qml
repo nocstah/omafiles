@@ -43,6 +43,9 @@ Column {
     font.pixelSize: Style.font.title
     horizontalAlignment: Text.AlignHCenter
     width: parent.width
+    // Text does not clip to its width -- a long message (e.g. "No results
+    // for" a long query) painted across the neighboring panels.
+    wrapMode: Text.Wrap
   }
 
   Text {
@@ -54,5 +57,6 @@ Column {
     font.pixelSize: Style.font.body
     horizontalAlignment: Text.AlignHCenter
     width: parent.width
+    wrapMode: Text.Wrap
   }
 }

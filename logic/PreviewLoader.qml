@@ -57,6 +57,10 @@ Item {
       PreviewContentState.previewRequestId += 1
       PreviewContentState.previewEntry = entry
       PreviewContentState.previewDirPath = Utils.entryPath(NavState.currentPath, entry)
+      // A dir is never a text preview. Leaving this stale from the previous
+      // file kept the text Flickable visible, ghosting the old file's
+      // content behind the directory listing.
+      PreviewContentState.previewIsText = false
       PreviewState.previewOpen = true
       return
     }
