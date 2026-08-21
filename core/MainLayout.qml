@@ -85,6 +85,10 @@ Item {
       }
 
       Rectangle {
+        // The sidebar's divider goes away WITH the sidebar: with every pane
+        // in yazi mode there is nothing to separate, and the orphaned line
+        // sat at the window's left edge.
+        visible: !mainLayout.anyPaneYazi
         width: Style.spacing.hairline
         height: parent.height
         color: Color.menu.border
@@ -94,7 +98,11 @@ Item {
       // ---------- Main content ----------
       Column {
         id: mainColumn
-        width: parent.width - sidebar.width - 1 - parent.spacing * 2
+        // Full width when the sidebar chrome (and its divider + the two Row
+        // gaps around it) is away -- the old formula kept subtracting them,
+        // leaving a dead strip on the left.
+        width: mainLayout.anyPaneYazi ? parent.width
+          : parent.width - sidebar.width - 1 - parent.spacing * 2
         height: parent.height
         spacing: Style.spacing.rowGap
 
