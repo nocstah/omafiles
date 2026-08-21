@@ -35,6 +35,11 @@ Item {
   // way yazi's third column does, instead of showing "no file selected".
   property string dirPath: ""
   property Item fileMeta: null
+  // Fraction the file list takes of the area this panel splits with it.
+  // Defaults to the ACTIVE pane's global; BackgroundPanel overrides it with
+  // the yazi ratio so a background pane's split doesn't depend on whatever
+  // stance the active pane happens to be in.
+  property real listFraction: NavState.listFraction
 
   BorderSurface {
     id: previewPanel
@@ -42,7 +47,7 @@ Item {
     anchors.top: parent.top
     anchors.bottom: parent.bottom
     anchors.right: parent.right
-    width: parent.width * (1 - NavState.listFraction) - Style.spacing.rowGap
+    width: parent.width * (1 - root.listFraction) - Style.spacing.rowGap
     radius: Style.cornerRadius
     color: Color.menu.selectedBackground
     borderSpec: Border.flat(Color.menu.border, Style.normalBorderWidth)
@@ -253,6 +258,9 @@ Item {
         target: root
         function onDirPathChanged() { if (root.dirPath !== "") dirPreviewLister.list(root.dirPath) }
       }
+      // A panel created WITH a dirPath (a background pane restoring its
+      // saved preview) never gets the change signal -- list once at birth.
+      Component.onCompleted: if (root.dirPath !== "") dirPreviewLister.list(root.dirPath)
 
       ListView {
         id: dirPreviewList

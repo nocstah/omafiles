@@ -19,6 +19,9 @@ CursorSurface {
   property Item hostTabOps: null
   property Item hostNavController: null
   property int bgPanelIndex: -1
+  // The panel-level dim this row must cancel while hovered -- comes from
+  // BackgroundPanel.bgDim so the two can't drift apart.
+  property real panelDim: 1
 
   width: parent ? parent.width : 0
   // Same vertical padding formula as the active row (FileListRow): compact
@@ -28,19 +31,15 @@ CursorSurface {
   foreground: Color.menu.text
   accent: Color.accent
   hasCursor: bgRowMouse.containsMouse
-  // The hover fill/border is already semi-transparent on its own
-  // (Style.hoverFillFor) -- the whole bgPanel goes to opacity:0.72 to
-  // mark itself as "not the active panel", and without this that opacity is
-  // multiplied ALSO over the hover, ending up doubly weak/
-  // faded instead of the same look it has in the active panel.
-  // 1/0.72 cancels exactly the parent's opacity only while this
-  // specific row has the cursor over it.
-  opacity: hasCursor ? 1 / 0.72 : 1
+  // The hover fill/border is already semi-transparent on its own -- the
+  // whole bgPanel dims itself to panelDim to mark itself as "not the active
+  // panel", and without this that opacity multiplies ALSO over the hover,
+  // ending up doubly faded instead of the same look it has in the active
+  // panel. 1/panelDim cancels exactly the parent's dim only while this
+  // specific row has the cursor over it (upstream behavior).
+  opacity: hasCursor ? 1 / panelDim : 1
   // Alternating row background (P2.4, 2026-08-17) -- same as
   // panels/FileListRow.qml, see its comment for the full rationale.
-  // Deliberately NOT given the hasCursor-style opacity compensation above:
-  // the idle stripe should dim along with the rest of this
-  // not-the-active-panel row (uniform 0.72), not stand out from it.
   idleFill: index % 2 === 0 ? "transparent" : Style.normalFillFor(foreground, accent)
 
   DropArea {
