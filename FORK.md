@@ -13,13 +13,15 @@ passed, 0 failed, 147 total** — upstream's full 146 plus one check covering
 the per-pane yazi mode below. (Individual timing-sensitive checks can flake
 under machine load; a quiet run is clean.)
 
-Two Fedora dependency traps found getting there, both worth an upstream
-note: v1.1's archive/compress progress pipes every job through `script` (a
-fake PTY), which Fedora splits into the **`util-linux-script`** subpackage —
-without it every compress/extract quietly hangs and six selfchecks fail as a
-cascade. And without **`ffmpegthumbnailer`** the P0-4 symlink selfcheck
-misreports as "VULNERABLE"
-([sent upstream](https://github.com/Percius04/omafiles/pull/12)).
+Two Fedora dependency traps found getting there, both now reported (and
+fixed) upstream: v1.1's archive/compress progress pipes every job through
+`script` (a fake PTY), which Fedora splits into the **`util-linux-script`**
+subpackage — without it every compress/extract quietly hung and six
+selfchecks failed as a cascade
+([PR #21](https://github.com/Percius04/omafiles/pull/21), fallback also
+carried on this branch, so the fork now degrades gracefully without it).
+And without **`ffmpegthumbnailer`** the P0-4 symlink selfcheck misreports
+as "VULNERABLE" ([PR #12](https://github.com/Percius04/omafiles/pull/12)).
 
 ## Keys
 
