@@ -2,6 +2,7 @@ import QtQuick
 import qs.Commons
 import qs.Ui
 import "../shared"
+import "../state"
 
 Row {
   id: root
@@ -14,6 +15,18 @@ Row {
   property Item hostTabOps: null
   property Item hostCommandFacade: null
   property bool bgSearching: false
+
+  // Same chip the active header shows (identical size, so the header
+  // geometry doesn't shift when the panel changes role -- same B-06
+  // contract as the magnifier slot below), but hollow: the digit is the
+  // key that jumps here.
+  PanelIndexBadge {
+    id: bgBadge
+    anchors.verticalCenter: parent.verticalCenter
+    shown: TabsState.tabs.length > 1
+    panelIndex: root.index
+    isActive: root.index === TabsState.activeTabIndex
+  }
 
   // Same header as the active panel (back/forward/home/up) --
   // josema asked that the two look the same, not just the active panel
@@ -43,6 +56,7 @@ Row {
     // the panel becomes active -- no horizontal shift when switching
     // panels (Visual Sprint 3, B-06).
     width: parent.width - bgNavButtons.width - bgSearchPlaceholder.width - 2 * Style.spacing.controlGap
+      - (bgBadge.visible ? bgBadge.width + Style.spacing.controlGap : 0)
     height: parent.height
     segments: root.hostCommandFacade ? root.hostCommandFacade.pathSegmentsFor(root.modelData.path) : []
     activePath: root.modelData.path

@@ -82,8 +82,13 @@ Item {
             PanelSeparator {
               id: listSep
               anchors.top: parent.top
-              foreground: Color.menu.text
-              strength: 0.15
+              // With several panels up, the active one also gets a POSITIVE
+              // marker (the background panels only get a negative one --
+              // gray + dim): its header rule turns accent, so a glance says
+              // "keys land here" without comparing panels. Single panel keeps
+              // the stock gray rule.
+              foreground: TabsState.tabs.length > 1 ? Color.accent : Color.menu.text
+              strength: TabsState.tabs.length > 1 ? 0.6 : 0.15
             }
 
             MouseArea {
