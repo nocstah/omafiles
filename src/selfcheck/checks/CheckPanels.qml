@@ -184,5 +184,50 @@ QtObject {
             t0.start()
           })
         })
+
+        sc.add("Per-pane yazi mode: stance follows the pane across switch/close, sidebar rule sees every pane", function (done) {
+          var c = sc._content
+          if (!c || !c.controllers || !c.controllers.tabOps) { done(false, "no composition root"); return }
+          var tabOps = c.controllers.tabOps
+          // Snapshot the real trio the Shift+P toggle drives, to leave the
+          // suite exactly as found.
+          var prevMode = NavState.yaziMode
+          var prevParent = NavState.parentColumnOpen
+          var prevPreview = PreviewState.previewOpen
+          var prevPath = NavState.currentPath
+          function finish(ok, msg) {
+            NavState.yaziMode = prevMode
+            NavState.parentColumnOpen = prevParent
+            PreviewState.previewOpen = prevPreview
+            tabOps.saveActiveTab()
+            done(ok, msg)
+          }
+          // Pane 0 in yazi mode; pane 1 opened from it (inherits), then
+          // flipped to plain the way the yazi_mode action does.
+          NavState.yaziMode = true
+          NavState.parentColumnOpen = true
+          tabOps.openInNewTab(sc.listDir)
+          // Guard before ever calling closeTab(): on a lone tab it would
+          // request a real window close mid-suite.
+          if (TabsState.tabs.length !== 2) { finish(false, "openInNewTab didn't create a second pane"); return }
+          NavState.yaziMode = false
+          NavState.parentColumnOpen = false
+          tabOps.saveActiveTab() // the toggle's write-through
+          // While pane 1 (active) is plain, pane 0 is still yazi: the
+          // sidebar's every-pane-plain rule must keep it hidden.
+          var mixedStillYazi = TabsState.tabs[0].yaziMode === true
+          tabOps.switchToTab(0)
+          var paneZeroYazi = NavState.yaziMode === true && NavState.parentColumnOpen === true
+          tabOps.switchToTab(1)
+          var paneOnePlain = NavState.yaziMode === false && NavState.parentColumnOpen === false
+          tabOps.closeTab() // lands back on pane 0, which must restore its stance
+          var restoredAfterClose = NavState.yaziMode === true
+          var tabsBackToOne = TabsState.tabs.length === 1
+          if (NavState.currentPath !== prevPath) c.navController.navigateTo(prevPath)
+          finish(mixedStillYazi && paneZeroYazi && paneOnePlain && restoredAfterClose && tabsBackToOne,
+            "mixed-keeps-pane0-yazi=" + mixedStillYazi + " switch0-yazi=" + paneZeroYazi
+            + " switch1-plain=" + paneOnePlain + " close-restores=" + restoredAfterClose
+            + " tabs-restored=" + tabsBackToOne)
+        })
   }
 }

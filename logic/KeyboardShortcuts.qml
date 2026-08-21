@@ -307,9 +307,12 @@ Item {
       if (hostControllers && hostControllers.actionEngine) hostControllers.actionEngine.requestDeletePermanent()
       break
     case "yazi_mode":
-      // Sidebar out, parent + preview in, ratios locked to 2/3/4. One switch,
-      // because the three columns only make sense together -- toggling them
-      // separately just produced a four-pane hybrid.
+      // Parent + preview in, ratios locked to 2/3/4. One switch, because the
+      // three columns only make sense together -- toggling them separately
+      // just produced a four-pane hybrid. PER-PANE since the panes got their
+      // own modes: this toggles only the focused pane's stance; the sidebar
+      // follows the "every pane plain" rule in MainLayout instead of this
+      // flag directly.
       NavState.yaziMode = !NavState.yaziMode
       if (NavState.yaziMode) {
         NavState.parentColumnOpen = true
@@ -322,6 +325,10 @@ Item {
         NavState.parentColumnOpen = false
         PreviewState.previewOpen = false
       }
+      // Write-through to the tab object: it is what the sidebar rule and the
+      // session snapshot read for non-active panes, and it is otherwise only
+      // written on a switch.
+      if (hostControllers && hostControllers.tabOps) hostControllers.tabOps.saveActiveTab()
       break
     case "filter":
       if (hostControllers && hostControllers.searchOps) hostControllers.searchOps.startFilter()
