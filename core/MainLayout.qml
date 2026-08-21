@@ -286,7 +286,10 @@ Item {
             visible: width > 0
             hostNavController: controllers ? controllers.navController : null
             hostFileMeta: controllers ? controllers.fileMeta : null
-            Behavior on width { NumberAnimation { duration: 120 } }
+            // enabled-gated like SearchBar's Behaviors: animate the
+            // interactive Shift+P toggle, snap during a pane switch (see
+            // NavState.suppressLayoutAnim).
+            Behavior on width { enabled: !NavState.suppressLayoutAnim; NumberAnimation { duration: 120 } }
           }
 
           ActiveFileList {

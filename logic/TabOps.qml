@@ -224,6 +224,12 @@ Item {
     // bar would do the minimize/expand animation on the tab you arrive at
     // (it looks bad). It is suppressed during the whole switch; snap instead of animation.
     NavState.suppressSearchAnim = true
+    // Same for the layout: _restoreTabMode below may flip parentColumnOpen
+    // (mixed-stance switch), and the parent column's width tween would drag
+    // the list+preview sideways into a layout the background twin already
+    // painted. Stance restoration snaps; only an interactive Shift+P
+    // animates.
+    NavState.suppressLayoutAnim = true
     saveActiveTab()
     TabsState.activeTabIndex = index
     _restoreTabHistory(TabsState.tabs[index])
@@ -242,6 +248,7 @@ Item {
     _restoreTabSearch(TabsState.tabs[index])
     _restoreTabScroll(TabsState.tabs[index])
     NavState.suppressSearchAnim = false
+    NavState.suppressLayoutAnim = false
   }
 
   function newTab() {
@@ -268,6 +275,7 @@ Item {
   function closeTab() {
     if (TabsState.tabs.length <= 1) { root.requestClose(); return }
     NavState.suppressSearchAnim = true
+    NavState.suppressLayoutAnim = true
     var next = TabsState.tabs.slice()
     next.splice(TabsState.activeTabIndex, 1)
     TabsState.tabs = next
@@ -285,6 +293,7 @@ Item {
     _restoreTabSearch(TabsState.tabs[newIndex])
     _restoreTabScroll(TabsState.tabs[newIndex])
     NavState.suppressSearchAnim = false
+    NavState.suppressLayoutAnim = false
   }
 
   function nextTab() {

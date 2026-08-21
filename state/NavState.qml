@@ -126,6 +126,14 @@ QtObject {
   // minimize/expand animation of the bar, which looks bad (same reason as
   // suppressListFade for the list fade).
   property bool suppressSearchAnim: false
+  // Same idea for the LAYOUT: the parent column's width animates on an
+  // interactive Shift+P (nice), but a focus switch between panes of
+  // DIFFERENT stances flips parentColumnOpen/yaziMode as state restoration,
+  // and the 120ms width tween dragged the whole list+preview sideways into a
+  // layout the background twin had already painted -- everything visibly
+  // "re-animated into place" on every mixed-stance switch. Stance changes
+  // that come from a pane switch must SNAP.
+  property bool suppressLayoutAnim: false
   // Message if the listing of currentPath failed (permissions, folder deleted
   // between navigating and listing...). Empty = no error or listing in progress.
   property string currentPathError: ""
