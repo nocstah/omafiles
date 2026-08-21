@@ -8,16 +8,18 @@ every stock `Ctrl+` shortcut still does exactly what it does upstream.
 Tracked as commits on the [`noc`](../../tree/noc) branch, rebased onto upstream
 tags rather than carried as a patch file. `master` stays pristine upstream.
 
-Upstream's `--selfcheck` on this branch (rebased onto **v1.1.0**): **146
-passed, 1 failed, 147 total** — the check added over upstream's 146 covers
-the per-pane yazi mode below; the single failure is the same one a pristine
-build shows ([sent upstream](https://github.com/Percius04/omafiles/pull/12)).
+Upstream's `--selfcheck` on this branch (rebased onto **v1.1.0**): **147
+passed, 0 failed, 147 total** — upstream's full 146 plus one check covering
+the per-pane yazi mode below. (Individual timing-sensitive checks can flake
+under machine load; a quiet run is clean.)
 
-Heads-up for Fedora: v1.1's archive/compress progress pipes every job
-through `script` (a fake PTY), which Fedora splits into the
-**`util-linux-script`** subpackage — without it every compress/extract
-quietly hangs, and six selfchecks fail as a cascade. Worth an upstream note,
-since the code comments assume `script` is "always present".
+Two Fedora dependency traps found getting there, both worth an upstream
+note: v1.1's archive/compress progress pipes every job through `script` (a
+fake PTY), which Fedora splits into the **`util-linux-script`** subpackage —
+without it every compress/extract quietly hangs and six selfchecks fail as a
+cascade. And without **`ffmpegthumbnailer`** the P0-4 symlink selfcheck
+misreports as "VULNERABLE"
+([sent upstream](https://github.com/Percius04/omafiles/pull/12)).
 
 ## Keys
 
