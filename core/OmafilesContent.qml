@@ -68,7 +68,7 @@ Item {
     if (!root.loaded) {
       if (targetPath) {
         NavState.currentPath = targetPath
-        TabsState.tabs = [{ path: targetPath, history: [targetPath], historyIndex: 0 }]
+        TabsState.tabs = [{ path: targetPath, history: [targetPath], historyIndex: 0, yaziMode: NavState.yaziMode }]
         TabsState.navHistory = [targetPath]
         TabsState.navHistoryIndex = 0
         registry.navController.refresh()

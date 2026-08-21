@@ -66,7 +66,14 @@ Item {
   // restoring it after a real restart of the shell.
   function saveSession() {
     tabOps.saveActiveTab()
-    var snapshot = TabsState.tabs.map(function (t) { return { path: t.path } })
+    // The active tab's mode is read LIVE from NavState: its tab object is a
+    // write-behind copy that close() does not refresh (saveSession runs
+    // without a saveActiveTab first).
+    var snapshot = TabsState.tabs.map(function (t, i) {
+      return { path: t.path,
+               yaziMode: i === TabsState.activeTabIndex ? NavState.yaziMode
+                 : (t.yaziMode === undefined ? true : t.yaziMode === true) }
+    })
     _saveJson(Paths.sessionFile, { tabs: snapshot, activeTabIndex: TabsState.activeTabIndex })
   }
 
@@ -106,11 +113,23 @@ Item {
           ? parsed.tabs.filter(function (t) { return t && typeof t.path === "string" && t.path.charAt(0) === "/" })
           : []
         if (savedTabs.length > 0) {
-          TabsState.tabs = savedTabs.map(function (t) { return { path: t.path, history: [t.path], historyIndex: 0 } })
+          // yaziMode is per pane; a session from before the field existed
+          // defaults to on, same as NavState's own default.
+          TabsState.tabs = savedTabs.map(function (t) {
+            return { path: t.path, history: [t.path], historyIndex: 0,
+                     yaziMode: t.yaziMode === undefined ? true : t.yaziMode === true }
+          })
           TabsState.activeTabIndex = Math.max(0, Math.min(parsed.activeTabIndex || 0, TabsState.tabs.length - 1))
           NavState.currentPath = TabsState.tabs[TabsState.activeTabIndex].path
           TabsState.navHistory = [NavState.currentPath]
           TabsState.navHistoryIndex = 0
+          // Adopt the active pane's stance, same trio the Shift+P toggle
+          // drives -- restoring the mode without the columns left the layout
+          // half-assembled.
+          var m = TabsState.tabs[TabsState.activeTabIndex].yaziMode
+          NavState.yaziMode = m
+          NavState.parentColumnOpen = m
+          PreviewState.previewOpen = m
         }
         navController.refresh()
         if (!ArchiveState.inArchive) navController.startDirWatch(NavState.currentPath)

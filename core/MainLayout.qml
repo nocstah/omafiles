@@ -17,6 +17,16 @@ Item {
   property Timer gTimer
 
   property alias list: list
+
+  // Per-pane yazi mode: the sidebar is the ONE global piece of the mode, and
+  // it must never flip as a side effect of hover-to-activate (mixed modes
+  // plus hover focus would reflow the whole window on mouse travel). Policy:
+  // the sidebar shows only while EVERY pane is plain, so it changes only on
+  // an explicit Shift+P. The active pane is read live from NavState (its tab
+  // object is a write-behind copy); the rest from their tab objects.
+  readonly property bool anyPaneYazi: NavState.yaziMode
+    || TabsState.tabs.some(function (t, i) { return i !== TabsState.activeTabIndex && t.yaziMode === true })
+
   BorderSurface {
     id: card
     anchors.fill: parent
@@ -39,8 +49,8 @@ Item {
         id: sidebar
         // Chrome, not a navigation column: it has no place in the cascade, and
         // with it up the window showed FOUR panes.
-        visible: !NavState.yaziMode
-        width: NavState.yaziMode ? 0 : 170
+        visible: !mainLayout.anyPaneYazi
+        width: mainLayout.anyPaneYazi ? 0 : 170
         height: parent.height
         bookmarks: BookmarksState.bookmarks
         recentFiles: BookmarksState.recentFiles

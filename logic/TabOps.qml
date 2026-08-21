@@ -41,7 +41,10 @@ Item {
     if (path === tab.path) return
     var h = (tab.history || [tab.path]).slice(0, (tab.historyIndex !== undefined ? tab.historyIndex : 0) + 1)
     h.push(path)
-    next[index] = { path: path, history: h, historyIndex: h.length - 1 }
+    // Object.assign, NOT a fresh object: rebuilding the tab from scratch
+    // silently dropped every other saved field (yaziMode, scroll, search,
+    // preview...) the moment a background panel navigated.
+    next[index] = Object.assign({}, tab, { path: path, history: h, historyIndex: h.length - 1 })
     TabsState.tabs = next
   }
 
@@ -57,7 +60,7 @@ Item {
     if (hIdx <= 0) return
     var hist = tab.history || [tab.path]
     var next = TabsState.tabs.slice()
-    next[index] = { path: hist[hIdx - 1], history: hist, historyIndex: hIdx - 1 }
+    next[index] = Object.assign({}, tab, { path: hist[hIdx - 1], history: hist, historyIndex: hIdx - 1 })
     TabsState.tabs = next
   }
 
@@ -69,7 +72,7 @@ Item {
     var hIdx = tab.historyIndex !== undefined ? tab.historyIndex : 0
     if (hIdx >= hist.length - 1) return
     var next = TabsState.tabs.slice()
-    next[index] = { path: hist[hIdx + 1], history: hist, historyIndex: hIdx + 1 }
+    next[index] = Object.assign({}, tab, { path: hist[hIdx + 1], history: hist, historyIndex: hIdx + 1 })
     TabsState.tabs = next
   }
 
@@ -77,6 +80,10 @@ Item {
     var next = TabsState.tabs.slice()
     next[TabsState.activeTabIndex] = {
       path: NavState.currentPath, history: TabsState.navHistory, historyIndex: TabsState.navHistoryIndex,
+      // Per-pane yazi mode: the layout stance travels with the tab, exactly
+      // like its history and scroll do. parentColumnOpen rides along because
+      // the mode toggle drives it and the two must not disagree on return.
+      yaziMode: NavState.yaziMode, parentColumnOpen: NavState.parentColumnOpen,
       previewOpen: PreviewState.previewOpen, previewEntry: PreviewContentState.previewEntry, scrollY: list.contentY,
       inArchive: ArchiveState.inArchive, archivePath: ArchiveState.archivePath, archiveSubPath: ArchiveState.archiveSubPath,
       // Index of the first visible row (besides the scrollY in pixels): the
@@ -129,6 +136,18 @@ Item {
     if (tab.inArchive && tab.archivePath) {
       archiveBrowser.restore(tab.archivePath, tab.archiveSubPath)
     }
+  }
+
+  // Per-pane yazi mode: each tab keeps its own layout stance, saved by
+  // saveActiveTab like everything else. A tab from before the field existed
+  // (or an old session) inherits whatever mode is currently on rather than
+  // forcing a flip. Only the IN-PANE parts follow the tab -- the sidebar is
+  // global chrome and follows the "every pane plain" rule in MainLayout, so
+  // it never reflows the window as a side effect of hover-to-activate.
+  function _restoreTabMode(tab) {
+    var m = tab.yaziMode === undefined ? NavState.yaziMode : tab.yaziMode === true
+    NavState.yaziMode = m
+    NavState.parentColumnOpen = tab.parentColumnOpen === undefined ? m : tab.parentColumnOpen === true
   }
 
   function _restoreTabPreview(tab) {
@@ -219,6 +238,7 @@ Item {
     navController._goToPath(TabsState.tabs[index].path)
     root.suppressListFade = false
     _restoreTabArchive(TabsState.tabs[index])
+    _restoreTabMode(TabsState.tabs[index])
     _restoreTabPreview(TabsState.tabs[index])
     _restoreTabSearch(TabsState.tabs[index])
     _restoreTabScroll(TabsState.tabs[index])
@@ -227,7 +247,8 @@ Item {
 
   function newTab() {
     saveActiveTab()
-    TabsState.tabs = TabsState.tabs.concat([{ path: NavState.currentPath, history: [NavState.currentPath], historyIndex: 0 }])
+    // A new pane inherits the stance of the pane it was opened from.
+    TabsState.tabs = TabsState.tabs.concat([{ path: NavState.currentPath, history: [NavState.currentPath], historyIndex: 0, yaziMode: NavState.yaziMode }])
     TabsState.activeTabIndex = TabsState.tabs.length - 1
     TabsState.navHistory = [NavState.currentPath]
     TabsState.navHistoryIndex = 0
@@ -238,7 +259,7 @@ Item {
   function openInNewTab(path) {
     if (!path) return
     saveActiveTab()
-    TabsState.tabs = TabsState.tabs.concat([{ path: path, history: [path], historyIndex: 0 }])
+    TabsState.tabs = TabsState.tabs.concat([{ path: path, history: [path], historyIndex: 0, yaziMode: NavState.yaziMode }])
     TabsState.activeTabIndex = TabsState.tabs.length - 1
     TabsState.navHistory = [path]
     TabsState.navHistoryIndex = 0
@@ -260,6 +281,7 @@ Item {
     navController._goToPath(TabsState.tabs[newIndex].path)
     root.suppressListFade = false
     _restoreTabArchive(TabsState.tabs[newIndex])
+    _restoreTabMode(TabsState.tabs[newIndex])
     _restoreTabPreview(TabsState.tabs[newIndex])
     _restoreTabSearch(TabsState.tabs[newIndex])
     _restoreTabScroll(TabsState.tabs[newIndex])
