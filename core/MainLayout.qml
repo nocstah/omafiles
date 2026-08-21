@@ -134,6 +134,38 @@ Item {
             width: panelsRow.slotWidth
             height: panelsRow.height
 
+            // The active panel is LIT rather than the inactive ones being
+            // dimmed/darkened -- every treatment of the background panels
+            // (opacity, grayscale, dark ground) cost readability on panels
+            // that exist to be glanced at. A white wash at low alpha
+            // brightens ANY theme's card (pure black included, where
+            // Qt.lighter() is a no-op), so nothing ever gets harder to
+            // read. Only with several panels up: a lone panel keeps the
+            // stock card exactly.
+            Rectangle {
+              anchors.fill: parent
+              visible: TabsState.tabs.length > 1
+              color: Qt.rgba(1, 1, 1, 0.12)
+            }
+
+            // Hyprland-style focus frame: the same accent border the WM puts
+            // around the focused window, drawn around the focused panel --
+            // the one cue a Hyprland user parses without thinking. It lives
+            // in the panel GAP (negative margins), so it never covers a row;
+            // the radius mirrors the card's, which itself mirrors Hyprland's
+            // rounding. z above the content because the gap belongs to no
+            // child, and a plain Rectangle intercepts no mouse events.
+            Rectangle {
+              anchors.fill: parent
+              anchors.margins: -Math.round(Style.spacing.panelGap / 2)
+              z: 10
+              visible: TabsState.tabs.length > 1
+              color: "transparent"
+              radius: Style.cornerRadius
+              border.width: Math.max(2, Style.normalBorderWidth)
+              border.color: Util.alpha(Color.accent, 0.7)
+            }
+
         Column {
           id: activeTop
           anchors.top: parent.top
@@ -146,6 +178,14 @@ Item {
           width: parent.width
           height: Style.spacing.controlHeight
           spacing: Style.spacing.controlGap
+
+          PanelIndexBadge {
+            id: panelBadge
+            anchors.verticalCenter: parent.verticalCenter
+            shown: TabsState.tabs.length > 1
+            panelIndex: TabsState.activeTabIndex
+            isActive: true
+          }
 
           PanelNavButtons {
             id: navButtons
@@ -161,7 +201,8 @@ Item {
           Item {
             id: pathArea
             readonly property int minPathW: 120
-            width: Math.max(minPathW, parent.width - navButtons.width - searchBar.width - 2 * Style.spacing.controlGap)
+            width: Math.max(minPathW, parent.width - navButtons.width - searchBar.width - 2 * Style.spacing.controlGap
+              - (panelBadge.visible ? panelBadge.width + Style.spacing.controlGap : 0))
             height: parent.height
 
             MouseArea {
