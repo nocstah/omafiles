@@ -8,8 +8,9 @@ every stock `Ctrl+` shortcut still does exactly what it does upstream.
 Tracked as commits on the [`noc`](../../tree/noc) branch, rebased onto upstream
 tags rather than carried as a patch file. `master` stays pristine upstream.
 
-Upstream's `--selfcheck` on this branch: **124 passed, 1 failed, 125 total** —
-identical to a pristine `origin/master` build, same single failure ([sent
+Upstream's `--selfcheck` on this branch: **125 passed, 1 failed, 126 total** —
+the check added over upstream's 125 covers the per-pane yazi mode below; the
+single failure is identical to a pristine `origin/master` build ([sent
 upstream](https://github.com/Percius04/omafiles/pull/12)).
 
 ## Keys
@@ -34,16 +35,29 @@ and appear in the in-app `?` overlay like any stock binding.
 | `g` + letter | Jump: `h` home, `d` Downloads, `o` Documents, `c` ~/.config, `p` Projects, `m` Music, `i` Pictures, `v` Videos, `t` Trash, `r` / |
 
 `Alt+←`/`Alt+→` still navigate history, not directories — the plain arrows only
-bind with no modifier held, which is what keeps those two apart.
+bind with no modifier held, which is what keeps those two apart. The mouse's
+back/forward thumb buttons navigate the same history, anywhere in the window.
 
 ## Behaviour
 
-**Yazi mode** (`Shift+P`, on by default) switches the whole layout at once rather
-than toggling one pane: sidebar out, parent column and preview in, list width
+**Yazi mode** (`Shift+P`, on by default) switches a pane's layout at once
+rather than toggling one column: parent column and preview in, list width
 locked, and a `YAZI ·` marker in the status line. It's one switch because the
 three columns only make sense together — toggling them separately just produced a
 four-pane hybrid, and leaving the mode has to put the columns away too or "off"
 looks like yazi mode with a sidebar bolted on.
+
+The mode is **per pane**: `Shift+P` toggles only the focused pane, each pane
+remembers its stance like it remembers its history and scroll, and the stance
+survives restarts with the session. A background pane keeps painting its full
+three-column layout — parent column, list, and the exact preview it showed
+when it was last focused (the content is snapshotted with the tab, so nothing
+is re-requested) — so a focus change moves **only** the accent frame and the
+badge fill, never the columns. The one exception is the sidebar — it's global
+chrome, and since focus follows the mouse here, letting it track the focused
+pane would reflow the whole window on mouse travel. So it follows a
+window-level rule instead: the sidebar shows only while *every* pane is plain,
+changing only on an explicit `Shift+P`, never on hover.
 
 **The parent column** lives *inside* the active panel, not as a panel of its own:
 panels here are independent workspaces and hovering one switches the active tab,
@@ -71,6 +85,18 @@ a folder; a single selection is just the cursor, so persisting it would mark eve
 folder you walked through. Copy and cut act on marks ∪ current selection —
 **delete deliberately does not**, because the confirm dialog lists names from one
 folder and a cross-directory delete could remove things it never showed you.
+
+**The active panel is marked loudly; the inactive ones recede gently.**
+Strong treatments of the inactive panels (heavy dim, grayscale, a darkened
+ground) cost readability on exactly the panels you keep open to glance at,
+so those stay at upstream's slight 0.72 fade — and the active panel carries
+the real cues instead: a white wash at low alpha over its card ("lit"), its
+header rule turning accent, and a Hyprland-style accent focus frame drawn in
+the panel gap — the same border the WM puts around the focused window, so it
+parses without thinking. Every panel header also grows a small number chip
+showing the `1`–`9` key that jumps to it, accent-filled on the active panel
+and hollow on the rest. All of it appears only while several panels are up;
+a lone panel keeps the stock look exactly.
 
 **Compact mode** also skips folder-item counting while it's on, since nothing
 draws the result: counting stats every child of every visible folder. Measured on
