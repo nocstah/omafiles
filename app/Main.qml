@@ -44,7 +44,10 @@ ApplicationWindow {
     if (window._pendingPayload !== "") {
       var p = window._pendingPayload
       window._pendingPayload = ""
-      content.open(p)
+      // "\x1e" = bare relaunch: open("") restores/reattaches the loaded
+      // session (opened=true, watcher and list focus back) without changing
+      // folder.
+      content.open(p === "\x1e" ? "" : p)
     }
   }
   // Default size of the first opening; HostAdapter overrides it if
@@ -97,8 +100,13 @@ ApplicationWindow {
     // Esc / closing the last tab: no `shell` object to notify (there is no
     // Closes the application window.
     onCloseRequested: {
+      // window.close() routes through onClosing, which for a preloaded
+      // instance HIDES instead of quitting -- the unconditional Qt.quit()
+      // here killed the warm process anyway on the in-app close paths
+      // (Esc / closing the last panel), silently defeating the preload the
+      // same way the WM close used to before onClosing learned to hide.
       window.close()
-      Qt.quit()
+      if (!window._isPreload) Qt.quit()
     }
   }
 
@@ -123,8 +131,14 @@ ApplicationWindow {
       window.show()
       window.raise()
       window.requestActivate()
-      if (payload && payload !== "\x1e")
-        window._pendingPayload = payload
+      // A bare relaunch ("\x1e") must still REOPEN the content, not just come
+      // forward: onClosing ran content.close() when the preloaded window was
+      // put away (opened=false, dir watcher stopped -- and the file list's
+      // focus binds to root.opened), so show() without open() brought back a
+      // window that rendered and took mouse input but had a DEAD KEYBOARD
+      // and a stale listing. The sentinel is kept in _pendingPayload so the
+      // reopen still happens after the first frame, same as a path payload.
+      window._pendingPayload = (payload && payload !== "\x1e") ? payload : "\x1e"
     }
   }
 
