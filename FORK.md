@@ -8,10 +8,12 @@ every stock `Ctrl+` shortcut still does exactly what it does upstream.
 Tracked as commits on the [`noc`](../../tree/noc) branch, rebased onto upstream
 tags rather than carried as a patch file. `master` stays pristine upstream.
 
-Upstream's `--selfcheck` on this branch: **125 passed, 1 failed, 126 total** —
-the check added over upstream's 125 covers the per-pane yazi mode below; the
-single failure is identical to a pristine `origin/master` build ([sent
-upstream](https://github.com/Percius04/omafiles/pull/12)).
+Upstream's `--selfcheck` on this branch (rebased onto **v1.1.0**): **140
+passed, 7 failed, 147 total** — the check added over upstream's 146 covers
+the per-pane yazi mode below, and the 7 failures are byte-identical to a
+pristine v1.1.0 build on this machine (a transfer-queue/compress/media
+cluster that fails without the fork too; the fork's old known failure was
+[merged upstream](https://github.com/Percius04/omafiles/pull/12)).
 
 ## Keys
 

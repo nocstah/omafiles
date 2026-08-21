@@ -145,7 +145,15 @@ QtObject {
           // model update and the ListView actually instantiating delegate
           // Items for it can land a frame apart.
           sc._poll(function () {
+            // pendingSelectNames must have DRAINED too: the yazi layer's
+            // per-directory cursor memory arms it on every navigation, and
+            // the fresh listing consumes it asynchronously -- selecting the
+            // remembered row AFTER this test's selectOnly(-1) if the poll
+            // only waited for delegates. Under the longer V1.1 suite an
+            // earlier test always leaves a memory for listDir, which made
+            // this a deterministic failure, not a flake.
             return NavState.currentPath === sc.listDir && NavState.visibleEntries.length >= 2 && !!rowAt(0) && !!rowAt(1)
+              && NavState.pendingSelectNames.length === 0
           }, function (listed) {
             if (!listed) {
               finish(false, "fixture dir/delegates never listed -- path=" + NavState.currentPath
