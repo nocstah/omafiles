@@ -21,7 +21,10 @@ CursorSurface {
   property int bgPanelIndex: -1
 
   width: parent ? parent.width : 0
-  implicitHeight: bgRowContent.implicitHeight + Style.spacing.md * 2
+  // Same vertical padding formula as the active row (FileListRow): compact
+  // mode tightened it to xs there, and keeping md here made every tab switch
+  // visibly reflow the row spacing as the panel changed role.
+  implicitHeight: bgRowContent.implicitHeight + (NavState.compactMode ? Style.spacing.xs : Style.spacing.md) * 2
   foreground: Color.menu.text
   accent: Color.accent
   hasCursor: bgRowMouse.containsMouse
