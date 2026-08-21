@@ -8,12 +8,16 @@ every stock `Ctrl+` shortcut still does exactly what it does upstream.
 Tracked as commits on the [`noc`](../../tree/noc) branch, rebased onto upstream
 tags rather than carried as a patch file. `master` stays pristine upstream.
 
-Upstream's `--selfcheck` on this branch (rebased onto **v1.1.0**): **140
-passed, 7 failed, 147 total** — the check added over upstream's 146 covers
-the per-pane yazi mode below, and the 7 failures are byte-identical to a
-pristine v1.1.0 build on this machine (a transfer-queue/compress/media
-cluster that fails without the fork too; the fork's old known failure was
-[merged upstream](https://github.com/Percius04/omafiles/pull/12)).
+Upstream's `--selfcheck` on this branch (rebased onto **v1.1.0**): **146
+passed, 1 failed, 147 total** — the check added over upstream's 146 covers
+the per-pane yazi mode below; the single failure is the same one a pristine
+build shows ([sent upstream](https://github.com/Percius04/omafiles/pull/12)).
+
+Heads-up for Fedora: v1.1's archive/compress progress pipes every job
+through `script` (a fake PTY), which Fedora splits into the
+**`util-linux-script`** subpackage — without it every compress/extract
+quietly hangs, and six selfchecks fail as a cascade. Worth an upstream note,
+since the code comments assume `script` is "always present".
 
 ## Keys
 
