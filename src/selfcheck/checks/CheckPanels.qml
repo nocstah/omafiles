@@ -237,5 +237,48 @@ QtObject {
             + " switch1-plain=" + paneOnePlain + " close-restores=" + restoredAfterClose
             + " tabs-restored=" + tabsBackToOne)
         })
+
+        sc.add("Recents view: recency order, absolute paths, filter, guarded ops, up() leaves home", function (done) {
+          var c = sc._content
+          if (!c || !c.navController) { done(false, "no composition root"); return }
+          var prevPath = NavState.currentPath
+          // The suite runs against the REAL state dir, and recentFiles may
+          // never have been LOADED here -- so this check must not touch the
+          // disk at all: it seeds the in-memory state directly (addRecent
+          // would persist) and restores the in-memory state at the end.
+          // Writing a "restore" of the unloaded (empty) state once wiped the
+          // user's real recent.json -- never again.
+          var prevRecents = BookmarksState.recentFiles
+          function finish(ok, msg) {
+            BookmarksState.recentFiles = prevRecents
+            NavState.searchQuery = ""
+            if (NavState.currentPath !== prevPath) c.navController.navigateTo(prevPath)
+            done(ok, msg)
+          }
+          BookmarksState.recentFiles = [
+            { path: sc.note, name: "note.txt", time: Date.now() },      // most recent
+            { path: sc.png, name: "img.png", time: Date.now() - 1000 }
+          ]
+          c.navController.navigateTo(Paths.recentsDir)
+          var atRecents = NavState.currentPath === Paths.recentsDir
+          var e = NavState.entries
+          var orderOk = e.length >= 2 && e[0].name === "note.txt" && e[1].name === "img.png"
+          var carriesPath = e.length > 0 && e[0].path === sc.note && typeof e[0].parent === "string" && e[0].time > 0
+          // The f-filter rides visibleEntries, so it narrows the virtual
+          // listing like any folder's.
+          NavState.searchQuery = "img"
+          var filterOk = NavState.visibleEntries.some(function (x) { return x.name === "img.png" })
+            && NavState.visibleEntries.every(function (x) { return x.name.toLowerCase().indexOf("img") >= 0 })
+          NavState.searchQuery = ""
+          // Real-file ops must no-op in the virtual view (they resolve
+          // through the sentinel path).
+          c.actionEngine.startNewFolder()
+          var guardOk = EditModeState.creatingFolder === false
+          c.navController.goUp()
+          var upOk = NavState.currentPath === Paths.homeDir
+          finish(atRecents && orderOk && carriesPath && filterOk && guardOk && upOk,
+            "at-recents=" + atRecents + " order=" + orderOk + " abs-path=" + carriesPath
+            + " filter=" + filterOk + " ops-guarded=" + guardOk + " up-goes-home=" + upOk)
+        })
   }
 }

@@ -628,6 +628,7 @@ Item {
   // --- DeleteOps ---
 
   function requestDelete() {
+    if (NavState.currentPath === Paths.recentsDir) return  // virtual view: real-file ops resolve nothing here
     if (ArchiveState.inArchive) return
     var names = SelectionState.selectedEntries().map(function (e) { return e.name })
     if (names.length === 0) return
@@ -639,6 +640,7 @@ Item {
   // dialog text that changes, not the safety -- but there is no undo to push
   // afterwards, so none is registered.
   function requestDeletePermanent() {
+    if (NavState.currentPath === Paths.recentsDir) return  // virtual view: real-file ops resolve nothing here
     if (ArchiveState.inArchive) return
     if (NavState.currentPath === Paths.trashDir) { requestDelete(); return }
     var names = SelectionState.selectedEntries().map(function (e) { return e.name })
@@ -728,6 +730,7 @@ Item {
   }
 
   function copySelected() {
+    if (NavState.currentPath === Paths.recentsDir) return  // virtual view: real-file ops resolve nothing here
     if (ArchiveState.inArchive) return
     var entries = _selectionPaths()
     if (entries.length === 0) return
@@ -737,6 +740,7 @@ Item {
   }
 
   function cutSelected() {
+    if (NavState.currentPath === Paths.recentsDir) return  // virtual view: real-file ops resolve nothing here
     if (ArchiveState.inArchive) return
     var entries = _selectionPaths()
     if (entries.length === 0) return
@@ -855,6 +859,7 @@ Item {
   // JsonStore (declarative Connections over the services singleton).
 
   function startRename(index) {
+    if (NavState.currentPath === Paths.recentsDir) return  // virtual view: real-file ops resolve nothing here
     if (ArchiveState.inArchive) return
     if (index < 0 || index >= NavState.visibleEntries.length) return
     EditModeState.creatingFolder = false
@@ -888,6 +893,7 @@ Item {
   }
 
   function startNewFolder() {
+    if (NavState.currentPath === Paths.recentsDir) return  // virtual view: real-file ops resolve nothing here
     if (ArchiveState.inArchive) return
     EditModeState.renamingIndex = -1
     NavState.searching = false
@@ -896,6 +902,7 @@ Item {
   }
 
   function startNewFile() {
+    if (NavState.currentPath === Paths.recentsDir) return  // virtual view: real-file ops resolve nothing here
     if (ArchiveState.inArchive) return
     EditModeState.renamingIndex = -1
     NavState.searching = false
@@ -1199,6 +1206,7 @@ Item {
 
 
   function paste() {
+    if (NavState.currentPath === Paths.recentsDir) return  // virtual view: real-file ops resolve nothing here
     if (ArchiveState.inArchive) return
     if (ClipboardState.clipboardPaths.length === 0) {
       // Nothing copied from INSIDE Omafiles -- try the system

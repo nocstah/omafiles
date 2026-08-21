@@ -31,6 +31,7 @@ Item {
   signal recentLaunched(var item)
   signal recentRemoveRequested(string path)
   signal recentClearRequested()
+  signal recentsViewRequested()
   signal mountActivated(var mount)
   signal mountEjectRequested(var mount)
   signal networkMountOpened(var mount)
@@ -67,6 +68,7 @@ Item {
       onRecentLaunched: function(i) { root.recentLaunched(i) }
       onRecentRemoveRequested: function(p) { root.recentRemoveRequested(p) }
       onRecentClearRequested: function() { root.recentClearRequested() }
+      onRecentsViewRequested: function() { root.recentsViewRequested() }
     }
 
     SidebarMounts {

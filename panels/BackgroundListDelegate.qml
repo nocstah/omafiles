@@ -119,7 +119,9 @@ CursorSurface {
       fileIconGlyph: Utils.iconFor(modelData)
       thumbSource: bgRowContent.imgThumb ? Util.fileUrl(bgRowContent.imgThumb)
         : (bgRowContent.vidThumb ? Util.fileUrl(bgRowContent.vidThumb) : "")
-      metaText: hostFileMeta ? hostFileMeta.lineFor(modelData, panelPath) : ""
+      metaText: panelPath === Paths.recentsDir
+        ? String(modelData.parent || "").replace(Paths.homeDir, "~")
+        : (hostFileMeta ? hostFileMeta.lineFor(modelData, panelPath) : "")
       metaTooltip: hostFileMeta ? hostFileMeta.metaTooltipFor(modelData, panelPath) : ""
     }
   }

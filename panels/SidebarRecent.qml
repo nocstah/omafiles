@@ -16,6 +16,8 @@ Column {
   signal recentLaunched(var item)
   signal recentRemoveRequested(string path)
   signal recentClearRequested()
+  // Header click: jump into the full Recents view (Paths.recentsDir).
+  signal recentsViewRequested()
 
   width: parent ? parent.width : 0
   spacing: Style.spacing.md
@@ -44,6 +46,17 @@ Column {
     foreground: Color.menu.text
     fontFamily: Style.font.family
     fontSize: Style.font.subtitle
+
+    // The header is a DOOR, not just a label: clicking it opens the full
+    // Recents view in the active pane -- the sidebar only ever shows the
+    // first few entries, the view goes back hundreds.
+    MouseArea {
+      anchors.fill: parent
+      anchors.margins: -Style.spacing.xxs
+      hoverEnabled: true
+      cursorShape: Qt.PointingHandCursor
+      onClicked: root.recentsViewRequested()
+    }
   }
 
   Item {
@@ -53,7 +66,8 @@ Column {
   }
 
   Repeater {
-    model: root.recentFiles
+    // Only a teaser here -- the full history lives in the Recents view.
+    model: root.recentFiles.slice(0, 8)
 
     CursorSurface {
       OpacityAnimator on opacity { from: 0; to: 1; duration: 120; easing.type: Easing.OutCubic }

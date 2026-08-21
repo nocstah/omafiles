@@ -33,10 +33,27 @@ QtObject {
 
   function addRecent(path, name) {
     var next = recentFiles.filter(function (r) { return r.path !== path })
-    next.unshift({ path: path, name: name })
-    if (next.length > 20) next = next.slice(0, 20)
+    next.unshift({ path: path, name: name, time: Date.now() })
+    // 300, up from 20: the sidebar only ever SHOWS a handful, but the
+    // Recents view (Paths.recentsDir) is a real macOS-style history you can
+    // walk back through -- 20 entries made it pointless. ~30KB of JSON at
+    // the cap, nothing.
+    if (next.length > 300) next = next.slice(0, 300)
     recentFiles = next
     Backend.JsonStore.write(Paths.recentFile, next)
+  }
+
+  // The Recents view's listing: recency order preserved (assigned straight
+  // to NavState.entries, which bypasses DirLister's sorting), every entry
+  // carrying its absolute `path` + `parent` so the whole app resolves it the
+  // same way it already resolves global-search results (Utils.entryPath).
+  function recentsEntries() {
+    return recentFiles.map(function (r) {
+      var slash = r.path.lastIndexOf("/")
+      return { name: r.name || r.path.substring(slash + 1), path: r.path,
+               parent: slash > 0 ? r.path.substring(0, slash) : "/",
+               type: "file", time: r.time || 0 }
+    })
   }
 
   function removeRecent(path) {

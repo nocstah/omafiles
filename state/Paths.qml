@@ -39,6 +39,10 @@ QtObject {
   }
 
   readonly property string trashDir: xdgDataHome + "/Trash/files"
+  // Sentinel path of the VIRTUAL Recents view (see NavigationController's
+  // recents branch). Starts with "/" so tab/session filters keep it, and the
+  // double slash can never collide with a real normalized filesystem path.
+  readonly property string recentsDir: "//recent"
   readonly property string thumbCacheDir: cacheDir + "/thumbnails"
 
   // User-defined custom actions config path.

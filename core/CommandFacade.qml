@@ -146,6 +146,25 @@ Item {
       return actions
     }
 
+    // Recents view: its own reduced set, like trash. The regular
+    // rename/trash/copy machinery resolves through currentPath, which is a
+    // virtual sentinel here -- offering those would act on paths that don't
+    // exist. Open / reveal / forget covers what a recents list is for.
+    if (NavState.currentPath === Paths.recentsDir) {
+      if (!multi) {
+        actions.push({ label: "Open", action: function () { if (navController) navController.enter(entries[0]) } })
+        actions.push({ label: "Open containing folder", action: function () {
+          NavState.pendingSelectNames = [entries[0].name]
+          if (navController) navController.navigateTo(entries[0].parent)
+        } })
+      }
+      actions.push({ label: "Remove from Recents" + suffix, action: function () {
+        entries.forEach(function (e) { BookmarksState.removeRecent(e.path) })
+        if (navController) navController.refresh()
+      } })
+      return actions
+    }
+
     if (!multi) {
       actions.push({ label: "Open", action: function () { if (navController) navController.enter(entries[0]) } })
       if (entries[0].type === "dir") {
@@ -202,6 +221,11 @@ Item {
     var actions = []
     if (NavState.currentPath === Paths.trashDir) {
       actions.push({ label: "Empty trash", destructive: true, action: function () { if (actionEngine) actionEngine.emptyTrash() } })
+    } else if (NavState.currentPath === Paths.recentsDir) {
+      actions.push({ label: "Clear recents", destructive: true, action: function () {
+        BookmarksState.clearRecent()
+        if (navController) navController.refresh()
+      } })
     } else if (!ArchiveState.inArchive) {
       actions.push({ label: "New folder", action: function () { actionEngine.startNewFolder() } })
       actions.push({ label: "New file", action: function () { actionEngine.startNewFile() } })
@@ -305,6 +329,8 @@ Item {
   }
 
   function pathSegmentsFor(targetPath) {
+    // The Recents sentinel is not a real path -- one flat crumb.
+    if (targetPath === Paths.recentsDir) return [{ label: "Recent", path: Paths.recentsDir }]
     if (targetPath === "/") return [{ label: "/", path: "/" }]
     var parts = targetPath.split("/").filter(function (p) { return p.length > 0 })
     var acc = ""

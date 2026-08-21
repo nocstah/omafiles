@@ -149,6 +149,7 @@ Item {
       gTargets[Qt.Key_I] = Paths.homeDir + "/Pictures"
       gTargets[Qt.Key_V] = Paths.homeDir + "/Videos"
       gTargets[Qt.Key_T] = Paths.trashDir
+      gTargets[Qt.Key_E] = Paths.recentsDir
       gTargets[Qt.Key_R] = "/"
       var gDest = gTargets[event.key]
       if (gDest !== undefined) {

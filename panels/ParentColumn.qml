@@ -58,6 +58,7 @@ Item {
   readonly property bool applicable: parentPath !== ""
     && !inArchive
     && currentPath !== Paths.trashDir
+    && currentPath !== Paths.recentsDir
 
   readonly property bool shown: openFlag && applicable
 

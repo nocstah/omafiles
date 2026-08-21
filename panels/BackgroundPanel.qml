@@ -201,6 +201,13 @@ Item {
   function refreshMe() {
     if (bgPanel.effectivePath === "") return
     bgPanel._lastRefreshedPath = bgPanel.effectivePath
+    // Virtual Recents pane: its listing comes from BookmarksState, the same
+    // way the active pane's _applyRecents() does it -- DirLister on the
+    // sentinel would only produce a path error.
+    if (bgPanel.effectivePath === Paths.recentsDir) {
+      bgPanel._content = BookmarksState.recentsEntries()
+      return
+    }
     dirLister.list(bgPanel.effectivePath)
   }
 
@@ -437,8 +444,10 @@ Item {
       ? (bgPanel.bgVisibleSearchEntries.length + (bgPanel.bgVisibleSearchEntries.length === 1 ? " item" : " items")
          + " of " + bgPanel.bgSearchEntries.length
          + (bgPanel.modelData.searchTruncated ? " · showing first 200" : ""))
-      : (dirLister.entries.length + (dirLister.entries.length === 1 ? " item" : " items")
-         + " · sort: " + SortState.sortLabel())
+      : (bgPanel.effectivePath === Paths.recentsDir
+         ? (bgPanel._content.length + (bgPanel._content.length === 1 ? " item" : " items") + " · most recent first")
+         : (dirLister.entries.length + (dirLister.entries.length === 1 ? " item" : " items")
+            + " · sort: " + SortState.sortLabel()))
     font.pixelSize: Style.font.subtitle
     font.family: Style.font.family
     color: Color.menu.text

@@ -24,7 +24,20 @@ Item {
     // actions...) reloads the correct thing without having to remember to
     // check inArchive at every site.
     if (ArchiveState.inArchive) { archiveBrowser.refresh(); return }
+    // The Recents view is virtual: its listing comes from BookmarksState,
+    // not the filesystem, so a DirLister pass on the sentinel would only
+    // produce a path error.
+    if (NavState.currentPath === Paths.recentsDir) { _applyRecents(); return }
     dirLister.list(NavState.currentPath)
+  }
+
+  // Paint the VIRTUAL Recents listing. Direct NavState.entries assignment on
+  // purpose: it bypasses DirLister's sorting, which is exactly right -- the
+  // whole point of the view is recency order, not name order.
+  function _applyRecents() {
+    NavState.currentPathError = ""
+    NavState.entries = BookmarksState.recentsEntries()
+    root.loaded = true
   }
 
   // Reassigns NavState.entries ONLY if the content actually changed --
@@ -146,6 +159,8 @@ Item {
 
   // Live refresh of the ACTIVE panel: starts native QFileSystemWatcher via DirLister.
   function startDirWatch(path) {
+    // Nothing to inotify-watch behind the Recents sentinel.
+    if (path === Paths.recentsDir) { dirLister.unwatch(); return }
     dirLister.watch(path)
   }
 
@@ -215,6 +230,14 @@ Item {
       var remembered = NavState.cursorMemory[path]
       if (remembered) NavState.pendingSelectNames = [remembered]
     }
+    // Virtual Recents: paint from BookmarksState and skip the cache/watcher
+    // (refresh() above would route here anyway; doing it directly keeps the
+    // paint synchronous like the tabEntriesCache path below).
+    if (path === Paths.recentsDir) {
+      NavState.pendingSelectNames = []
+      _applyRecents()
+      return
+    }
     if (root.tabEntriesCache[path]) NavState.entries = root.tabEntriesCache[path]
     refresh()
     startDirWatch(path)
@@ -278,6 +301,17 @@ Item {
 
   function enter(entry) {
     if (!entry) return
+    // Recents view: unlike a search result (below, where Enter REVEALS),
+    // Enter here OPENS -- that's the whole point of a recents list, macOS-
+    // style: get back into the file, not to it. Folders still navigate, and
+    // opening re-bumps the entry to the top. Reveal stays available from
+    // the row's context menu.
+    if (NavState.currentPath === Paths.recentsDir && entry.path) {
+      if (entry.type === "dir") { navigateTo(entry.path); return }
+      BookmarksState.addRecent(entry.path, entry.name)
+      openWithDefault(entry.path)
+      return
+    }
     // GLOBAL search result (SearchBackend): the entry carries an absolute
     // `path` of any OTHER folder. "Open" here means REVEAL, like
     // in Nautilus/Spotlight: a folder -> enter it; a file -> go to
@@ -322,6 +356,8 @@ Item {
 
   function goUp() {
     if (ArchiveState.inArchive) { archiveBrowser.up(); return }
+    // Recents has no parent; "up" leaves the virtual view for home.
+    if (NavState.currentPath === Paths.recentsDir) { navigateTo(Paths.homeDir); return }
     if (NavState.currentPath === "/") return
     var idx = NavState.currentPath.lastIndexOf("/")
     // Land on the folder we just left, the way yazi does: going up should put

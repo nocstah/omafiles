@@ -42,7 +42,7 @@ and appear in the in-app `?` overlay like any stock binding.
 | `m` | Cycle line info: none → meta → perms → owner |
 | `Shift+P` | Toggle yazi mode (see below) |
 | `1`–`9` | Jump straight to a panel |
-| `g` + letter | Jump: `h` home, `d` Downloads, `o` Documents, `c` ~/.config, `p` Projects, `m` Music, `i` Pictures, `v` Videos, `t` Trash, `r` / |
+| `g` + letter | Jump: `h` home, `d` Downloads, `o` Documents, `c` ~/.config, `p` Projects, `m` Music, `i` Pictures, `v` Videos, `t` Trash, `e` Recents, `r` / |
 
 `Alt+←`/`Alt+→` still navigate history, not directories — the plain arrows only
 bind with no modifier held, which is what keeps those two apart. The mouse's
@@ -83,6 +83,18 @@ coming next.
 **Directories preview as a listing** — yazi's third column. Upstream closes the
 preview outright on any folder row, so browsing with it open collapses the layout
 constantly.
+
+**A real Recents view**, macOS-style. The sidebar's RECENT section only ever
+teased a handful of names; clicking its header (or `g e`) now opens Recents
+as a full virtual location in the pane — every row in true most-recent-first
+order (history deepened from 20 to 300 entries, timestamped), the parent
+folder as each row's second line, preview working, and yazi's `f` filter
+narrowing it live. Enter opens the file (and re-bumps it); folders navigate;
+the context menu swaps to Open / Open containing folder / Remove from
+Recents, and real-file operations (rename, trash, paste…) are inert here —
+it's a view of history, not a folder. Built trash-style on a sentinel path,
+so panes, history, per-pane stances and the session all treat it as just
+another location.
 
 **Per-directory cursor memory.** Re-entering a folder puts the cursor back where
 you left it. Session-lifetime, deliberately not persisted.

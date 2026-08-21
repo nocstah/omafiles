@@ -72,6 +72,7 @@ Item {
         onRecentLaunched: function (item) { if (commandFacade) commandFacade.launchRecent(item) }
         onRecentRemoveRequested: function (path) { if (controllers) controllers.BookmarksState.removeRecent(path) }
         onRecentClearRequested: if (controllers) controllers.BookmarksState.clearRecent()
+        onRecentsViewRequested: if (controllers) controllers.navController.navigateTo(Paths.recentsDir)
         onMountActivated: function (mount) {
           if (!mount.mounted) { if (controllers) controllers.mountOps.mountDevice(mount) }
           else { if (controllers) controllers.navController.navigateTo(mount.path) }
@@ -373,7 +374,9 @@ Item {
                 + (ClipboardState.clipboardPaths.length > 0 ? " · clipboard: " + ClipboardState.clipboardPaths.length + (ClipboardState.clipboardPaths.length === 1 ? " item" : " items") + (ClipboardState.clipboardMode === "cut" ? " (cut)" : " (copied)") : "")
                 // "(s)" because the direction arrow alone reads like a key hint
                 // — it is the sort ORDER, not the shortcut.
-                + " · sort: " + (controllers ? controllers.SortState.sortLabel() : "") + " (s)"
+                + (NavState.currentPath === Paths.recentsDir
+                  ? " · most recent first"
+                  : " · sort: " + (controllers ? controllers.SortState.sortLabel() : "") + " (s)")
               font.pixelSize: Style.font.subtitle
               font.family: Style.font.family
               color: Color.menu.text

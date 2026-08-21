@@ -165,7 +165,11 @@ CursorSurface {
       fileIconGlyph: Utils.iconFor(modelData)
       thumbSource: rowContent.imgThumb ? Util.fileUrl(rowContent.imgThumb)
         : (rowContent.vidThumb ? Util.fileUrl(rowContent.vidThumb) : "")
-      metaText: hostFileMeta.lineFor(modelData, NavState.currentPath)
+      // Recents view: WHERE the file lives is the useful second line, not
+      // its size/age.
+      metaText: NavState.currentPath === Paths.recentsDir
+        ? String(modelData.parent || "").replace(Paths.homeDir, "~")
+        : hostFileMeta.lineFor(modelData, NavState.currentPath)
       metaTooltip: hostFileMeta.metaTooltipFor(modelData)
       showNameText: EditModeState.renamingIndex !== index
     }
