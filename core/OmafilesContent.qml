@@ -212,6 +212,23 @@ Item {
   }
 
   // --- UI Components & Dialogs ---
+  // Mouse back/forward (the thumb buttons) mirror Alt+Left/Alt+Right. This
+  // sits UNDER MainLayout in the z-order: nothing else in the tree accepts
+  // these two buttons, so every press falls through to here, and restricting
+  // acceptedButtons means it never shadows a left/right click, wheel or hover
+  // of the real UI above it.
+  MouseArea {
+    anchors.fill: parent
+    acceptedButtons: Qt.BackButton | Qt.ForwardButton
+    onPressed: function (mouse) {
+      // Same reason the keyboard path bails with a dialog up: navigating
+      // underneath an open confirm/palette would act on the wrong folder.
+      if (root.hasBlockingOverlay) return
+      if (mouse.button === Qt.BackButton) registry.navController.navBack()
+      else registry.navController.navForward()
+    }
+  }
+
   MainLayout {
     id: mainLayout
     anchors.fill: parent
