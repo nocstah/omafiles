@@ -51,6 +51,7 @@ Item {
     MouseArea { anchors.fill: parent; onClicked: {} }
 
     Column {
+      id: previewCol
       anchors.fill: parent
       anchors.topMargin: previewPanel.contentTopInset
       anchors.rightMargin: previewPanel.contentRightInset
@@ -187,6 +188,10 @@ Item {
         Text {
           width: parent.width
           horizontalAlignment: Text.AlignHCenter
+          // Text does NOT clip to its width -- without a wrapMode a line
+          // longer than the panel painted straight across the neighboring
+          // columns.
+          wrapMode: Text.Wrap
           text: "No preview available"
           font.pixelSize: Style.font.title
           font.family: Style.font.family
@@ -197,6 +202,7 @@ Item {
         Text {
           width: parent.width
           horizontalAlignment: Text.AlignHCenter
+          wrapMode: Text.Wrap
           text: "Press Enter to open with default app"
           font.pixelSize: Style.font.subtitle
           font.family: Style.font.family
@@ -205,12 +211,19 @@ Item {
         }
       }
 
-      EmptyState {
-        visible: !root.hasEntry && root.dirPath === ""
-        centerOn: parent
-        message: "No file selected"
-        subMessage: "Select a file to preview its contents"
-      }
+    }
+
+    // OUTSIDE the Column on purpose. EmptyState positions itself with
+    // anchors.centerIn, and an anchored child inside a positioner doesn't
+    // just misplace itself -- the Column logs "Column will not function" and
+    // PERMANENTLY stops laying out its children. Once "No file selected" had
+    // been shown once, every later text preview rendered its Flickable at
+    // y:0, painting the file's first line on top of the filename header.
+    EmptyState {
+      visible: !root.hasEntry && root.dirPath === ""
+      centerOn: previewCol
+      message: "No file selected"
+      subMessage: "Select a file to preview its contents"
     }
 
     // Directory under the cursor -> its listing (yazi's third column).
