@@ -29,6 +29,12 @@ Item {
   property Item hostFileMeta: null
   // Path whose PARENT is being listed (the active panel's folder).
   property string currentPath: NavState.currentPath
+  // Stance/context gates. They default to the ACTIVE pane's globals, so the
+  // MainLayout use is unchanged -- BackgroundPanel overrides them with its
+  // tab's saved state, because per-pane yazi mode means a background pane
+  // keeps its own parent column instead of the columns following focus.
+  property bool openFlag: NavState.parentColumnOpen
+  property bool inArchive: ArchiveState.inArchive
 
   // The folder we are inside, i.e. the row to highlight in the parent listing.
   readonly property string currentName: {
@@ -50,10 +56,10 @@ Item {
   //     the archive's folder while the list shows archive members: a lie
   //   - the trash view aggregates several roots; it has no single parent
   readonly property bool applicable: parentPath !== ""
-    && !ArchiveState.inArchive
+    && !inArchive
     && currentPath !== Paths.trashDir
 
-  readonly property bool shown: NavState.parentColumnOpen && applicable
+  readonly property bool shown: openFlag && applicable
 
   DirLister {
     id: parentLister

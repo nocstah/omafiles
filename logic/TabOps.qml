@@ -74,6 +74,16 @@ Item {
       // the mode toggle drives it and the two must not disagree on return.
       yaziMode: NavState.yaziMode, parentColumnOpen: NavState.parentColumnOpen,
       previewOpen: PreviewState.previewOpen, previewEntry: PreviewContentState.previewEntry, scrollY: list.contentY,
+      // The preview CONTENT rides along too (cheap string/array references,
+      // same idea as `entries` below): a yazi-stance pane keeps painting its
+      // whole three-column layout in the background, and its preview column
+      // shows exactly what it showed while active -- re-requesting the text
+      // instead would fight PreviewProvider's single generation counter with
+      // the active pane's own preview.
+      previewIsText: PreviewContentState.previewIsText,
+      previewText: PreviewContentState.previewText,
+      previewHighlighted: PreviewContentState.previewHighlighted,
+      previewAudioInfo: PreviewContentState.previewAudioInfo,
       inArchive: ArchiveState.inArchive, archivePath: ArchiveState.archivePath, archiveSubPath: ArchiveState.archiveSubPath,
       // Index of the first visible row (besides the scrollY in pixels): the
       // background panel restores it with positionViewAtIndex, which is IMMUNE to the

@@ -32,9 +32,15 @@ Item {
   // didn't hit the mark until a couple of frames later -> the scroll jump. With opacity:0
   // (in the active slot) the ListView STILL has a real layout (ch>0), covered by the
   // activePanel that goes on top in the same slot; on moving to the background it positions
-  // instantly, frozen. The background slots go to the usual 0.72 dim.
+  // instantly, frozen. The background slots keep upstream's gentle 0.72 dim:
+  // stronger treatments (0.55 + grayscale, a dark ground) cost readability
+  // on exactly the panels you keep open to glance at, but with the ACTIVE
+  // pane carrying the loud cues (focus frame, badge, lit wash -- see
+  // activePanel in core/MainLayout.qml) the original slight dim earns its
+  // keep again as the quiet "receded" half of the pair.
   visible: true
-  opacity: index === TabsState.activeTabIndex ? 0 : 0.72
+  readonly property real bgDim: 0.72
+  opacity: index === TabsState.activeTabIndex ? 0 : bgDim
   x: hostPanelsRow.slotX(index)
   y: 0
   width: hostPanelsRow.slotWidth
@@ -58,6 +64,41 @@ Item {
   readonly property var bgVisibleSearchEntries: {
     var q = (modelData.searchQuery || "").toLowerCase()
     return bgSearchEntries.filter(function (e) { return e.name.toLowerCase().indexOf(q) >= 0 })
+  }
+
+  // ---- Per-pane yazi stance: a background pane KEEPS its three-column
+  // layout. The columns must not follow focus -- the only things that move
+  // on a focus change are the focus frame and the badge fill. Geometry
+  // mirrors the active pane exactly: parent 2/9 of the slot, then the rest
+  // splits 3/7 list / 4/7 preview.
+  readonly property bool bgYazi: modelData.yaziMode === true
+  readonly property real bgParentW: bgYazi ? Math.round(width * 2 / 9) : 0
+  readonly property real bgRestW: width - bgParentW
+  readonly property bool bgPreviewShown: bgYazi && modelData.previewOpen !== false
+  readonly property real bgListW: bgPreviewShown ? bgRestW * (3 / 7) : bgRestW
+
+  // What this pane's preview column shows: the entry it was previewing when
+  // it was last active (saved by saveActiveTab together with the CONTENT, so
+  // nothing is re-requested). Thumbnails come from ThumbnailProvider's
+  // cache -- its onReady broadcast is multi-consumer safe, same pattern the
+  // row delegates already use.
+  readonly property var pvEntry: bgYazi && modelData.previewEntry ? modelData.previewEntry : null
+  readonly property string pvPath: pvEntry ? Utils.entryPath(modelData.path || "", pvEntry) : ""
+  readonly property bool pvIsImg: pvEntry ? Utils.isImage(pvEntry) : false
+  readonly property bool pvIsPdf: pvEntry ? Utils.isPdf(pvEntry) : false
+  readonly property bool pvIsVid: pvEntry ? Utils.isVideo(pvEntry) : false
+  property string pvThumb: ""
+  function _refreshPvThumb() {
+    pvThumb = (pvPath !== "" && (pvIsImg || pvIsPdf))
+      ? (Backend.ThumbnailProvider.request(pvPath, 1600) || "") : ""
+    if (pvEntry && pvIsVid && hostVideoThumbs) hostVideoThumbs.requestVideoThumb(pvEntry, modelData.path || "")
+  }
+  onPvPathChanged: _refreshPvThumb()
+  Connections {
+    target: Backend.ThumbnailProvider
+    function onReady(path, thumbPath) {
+      if (path === bgPanel.pvPath && bgPanel.pvThumb === "") bgPanel.pvThumb = thumbPath
+    }
   }
 
   // The listing itself lives in DirLister -- same
@@ -186,7 +227,7 @@ Item {
     target: NavState
     function onRefreshTickChanged() { bgPanel.refreshMe() }
   }
-  Component.onCompleted: bgPanel.refreshMe()
+  Component.onCompleted: { bgPanel.refreshMe(); bgPanel._refreshPvThumb() }
 
   // Scroll shared with the active panel (tab.scrollY = list.contentY). On
   // moving THIS panel to the background we have to reflect in its bgList the scroll it
@@ -271,6 +312,29 @@ Item {
     color: Color.urgent
   }
 
+  // Parent column (yazi's left column) of THIS pane's own path -- present
+  // whenever the pane's stance is yazi, active or not. Clicks are safe:
+  // hover already activated the pane before any click can land, so the
+  // navController navigates the right pane.
+  ParentColumn {
+    // Same top as the ACTIVE pane's parent column: listContainer there
+    // starts at the separator's own level (header + rowGap), not below it.
+    // Anchoring to the separator's bottom left this 1px + rowGap lower and
+    // the column visibly hopped on every focus change.
+    anchors.top: bgHeaderRow.bottom
+    anchors.topMargin: Style.spacing.rowGap
+    anchors.bottom: bgStatusText.top
+    anchors.bottomMargin: Style.spacing.rowGap
+    anchors.left: parent.left
+    width: bgPanel.bgParentW
+    visible: width > 0
+    currentPath: bgPanel.modelData.path || ""
+    openFlag: bgPanel.bgYazi && bgPanel.modelData.parentColumnOpen !== false
+    inArchive: bgPanel.modelData.inArchive === true
+    hostNavController: bgPanel.hostNavController
+    hostFileMeta: bgPanel.hostFileMeta
+  }
+
   ListView {
     id: bgList
     anchors.top: bgErrorText.visible ? bgErrorText.bottom : bgHeaderSep.bottom
@@ -278,7 +342,8 @@ Item {
     anchors.bottom: bgStatusText.top
     anchors.bottomMargin: Style.spacing.rowGap
     anchors.left: parent.left
-    anchors.right: parent.right
+    anchors.leftMargin: bgPanel.bgParentW
+    width: bgPanel.bgListW
     clip: true
     model: bgPanel.bgSearching ? bgPanel.bgVisibleSearchEntries : bgPanel._content
     boundsBehavior: Flickable.StopAtBounds
@@ -293,6 +358,52 @@ Item {
       hostTabOps: bgPanel.hostTabOps
       hostNavController: bgPanel.hostNavController
       bgPanelIndex: bgPanel.index
+      panelDim: bgPanel.bgDim
+    }
+  }
+
+  // Preview column (yazi's right column), painting the SAVED preview state:
+  // entry, text and audio info come from the tab object; thumbnails from the
+  // shared cache. The wrapper spans the whole area right of the parent
+  // column so PreviewPanel's own (1 - listFraction) split lands on the same
+  // 4/7 the active pane uses.
+  Item {
+    visible: bgPanel.bgPreviewShown
+    // Same geometry as the ACTIVE pane's PreviewPanel, which fills
+    // listContainer: top at the separator's level (header + rowGap), bottom
+    // one rowGap above the footer. Anything else makes the preview box jump
+    // vertically on focus changes between same-stance panes.
+    anchors.top: bgHeaderRow.bottom
+    anchors.topMargin: Style.spacing.rowGap
+    anchors.bottom: bgStatusText.top
+    anchors.bottomMargin: Style.spacing.rowGap
+    anchors.right: parent.right
+    width: bgPanel.bgRestW
+
+    PreviewPanel {
+      anchors.fill: parent
+      open: bgPanel.bgPreviewShown
+      listFraction: 3 / 7
+      entryName: bgPanel.pvEntry ? (bgPanel.pvEntry.name || "") : ""
+      hasEntry: !!bgPanel.pvEntry
+      isImageEntry: bgPanel.pvIsImg
+      isVideoEntry: bgPanel.pvIsVid
+      isTextEntry: !!bgPanel.pvEntry && !bgPanel.pvIsImg && bgPanel.modelData.previewIsText === true
+      isPdfEntry: bgPanel.pvIsPdf
+      isAudioEntry: bgPanel.pvEntry ? Utils.isAudio(bgPanel.pvEntry) : false
+      imageSource: bgPanel.pvIsImg && bgPanel.pvThumb ? Util.fileUrl(bgPanel.pvThumb) : ""
+      videoThumbSource: {
+        if (!bgPanel.pvEntry || !bgPanel.pvIsVid) return ""
+        var p = VideoThumbState.videoThumbReady[Utils.thumbKeyFor(bgPanel.pvEntry, bgPanel.modelData.path || "")] || ""
+        return p ? Util.fileUrl(p) : ""
+      }
+      pdfImageSource: bgPanel.pvIsPdf && bgPanel.pvThumb ? Util.fileUrl(bgPanel.pvThumb) : ""
+      highlightedText: bgPanel.modelData.previewHighlighted || ""
+      plainText: bgPanel.modelData.previewText || ""
+      audioInfo: bgPanel.modelData.previewAudioInfo || []
+      fallbackSizeText: bgPanel.pvEntry ? Utils.formatSize(bgPanel.pvEntry.size) : ""
+      dirPath: bgPanel.pvEntry && bgPanel.pvEntry.type === "dir" ? bgPanel.pvPath : ""
+      fileMeta: bgPanel.hostFileMeta
     }
   }
 
